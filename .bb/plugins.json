@@ -3,6 +3,7 @@
   "schemaVersion": 1,
   "name": "bb-workshop",
   "plugins": [
+    { "name": "agent-activity", "source": "./plugins/agent-activity" },
     { "name": "archived-threads", "source": "./plugins/archived-threads" },
     { "name": "delivery-dashboard", "source": "./plugins/delivery-dashboard" },
     { "name": "kanban", "source": "./plugins/kanban" },
