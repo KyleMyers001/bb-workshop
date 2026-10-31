@@ -99,6 +99,6 @@ export function NeedsYouPage() {
 }
 
 export default definePluginApp(app => {
-  app.slots.navPanel({ id: "inbox", title: "Needs you", icon: "Inbox", path: "inbox",
+  app.slots.navPanel({ id: "inbox", title: "Needs you", icon: "needs-you/attention", path: "inbox",
     component: NeedsYouPage, experimental_useBadge: useInboxBadge });
 });

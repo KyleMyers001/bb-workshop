@@ -7,7 +7,10 @@
   "bb": {
     "name": "Needs You",
     "description": "An attention inbox for agent questions, permission requests, blockers, and review handoffs.",
-    "branding": { "icon": "Inbox" },
+    "branding": {
+      "icon": "./assets/attention.svg",
+      "experimental_icons": { "attention": "./assets/attention.svg" }
+    },
     "server": "./server.ts",
     "app": "./app.tsx",
     "skills": ["skills"]

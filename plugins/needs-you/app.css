@@ -41,6 +41,7 @@
 .needs-detail>p.needs-ask{font-size:13px;color:var(--foreground);padding-left:12px;border-left:2px solid var(--primary)}
 .needs-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:18px}
 .needs-page .needs-primary{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary);font-weight:600}
+.needs-page .needs-primary:hover{background:color-mix(in srgb,var(--primary) 90%,var(--primary-foreground));color:var(--primary-foreground)}
 .needs-detail>p.needs-safety{font-size:11px;margin-top:12px}
 .needs-detail>p.needs-snoozed-until{margin-top:12px;color:var(--warning-text,var(--warning))}
 .needs-provenance{margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-foreground)}
