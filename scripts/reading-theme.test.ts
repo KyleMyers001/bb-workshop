@@ -20,6 +20,16 @@ test("Studio preserves Observatory's palette, input, and existing behavior", () 
     JSON.parse(readFileSync(new URL("theme.json", original), "utf8")));
 });
 
+test("conversation edges are compact without removing spacing between paragraphs", () => {
+  const css = stylesheet();
+  assert.match(css,
+    /\[data-message-column\] \[data-markdown-preview\] > :first-child\s*\{\s*margin-top:\s*0;\s*\}/);
+  assert.match(css,
+    /\[data-message-column\] \[data-markdown-preview\] > :last-child\s*\{\s*margin-bottom:\s*0;\s*\}/);
+  assert.match(css,
+    /\[data-message-column\] \[data-markdown-preview\] p\s*\{\s*margin:\s*\.85em 0;\s*\}/);
+});
+
 test("new rules are confined to conversation Markdown, never the input or fades", () => {
   const css = stylesheet().split(marker)[1];
   assert.ok(css, "Reading section must be explicitly delimited");
