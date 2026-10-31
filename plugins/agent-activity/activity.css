@@ -1,0 +1,58 @@
+.aa-anchor {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 32px);
+  list-style: none;
+}
+.aa-bar { display: flex; align-items: center; gap: 1px; white-space: nowrap; }
+.aa-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--bb-title-bar-control-size, 30px);
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.aa-button:hover, .aa-close:hover, .aa-row:hover, .aa-more:hover {
+  background: var(--sidebar-accent, var(--accent));
+}
+.aa-button:focus-visible, .aa-close:focus-visible, .aa-row:focus-visible, .aa-more:focus-visible {
+  outline: 2px solid var(--ring, var(--primary));
+  outline-offset: -2px;
+}
+.aa-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+.aa-waiting { color: var(--warning-text, var(--attention)); }
+.aa-errors { color: var(--destructive-text, var(--destructive)); }
+.aa-waiting .aa-dot { background: var(--attention); }
+.aa-errors .aa-dot { background: var(--destructive); }
+/* Avoid waiting on an exit animation in host-shimmed popovers. */
+.aa-popover { width: min(340px, calc(100vw - 24px)); padding: 0; overflow: hidden; animation: none !important; }
+.aa-heading { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 6px 12px; gap: 8px; }
+.aa-heading h2 { margin: 0; font-size: 12px; font-weight: 600; }
+.aa-heading h2 span { color: var(--muted-foreground); font-size: 11px; font-weight: 400; }
+.aa-close { border: 0; border-radius: 5px; background: transparent; color: var(--muted-foreground); font: inherit; font-size: 20px; width: 28px; height: 28px; cursor: pointer; }
+.aa-list { max-height: min(360px, 55dvh); overflow-y: auto; overscroll-behavior: contain; }
+.aa-row { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; text-decoration: none; font-size: 12px; }
+.aa-row .aa-dot { margin-top: 6px; }
+.aa-row-text { min-width: 0; flex: 1; }
+.aa-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--foreground); }
+.aa-meta { display: block; color: var(--muted-foreground); font-size: 10px; margin-top: 2px; }
+.aa-arrow { color: var(--muted-foreground); font-size: 16px; }
+.aa-note { border-top: 1px solid var(--border); margin: 0; padding: 9px 12px; font-size: 10px; color: var(--muted-foreground); }
+.aa-empty { margin: 0; padding: 12px; font-size: 12px; color: var(--muted-foreground); }
+.aa-more { display: block; margin: 5px auto; padding: 6px 12px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--foreground); font: inherit; font-size: 12px; cursor: pointer; }
+.aa-unavailable { padding: 5px 6px; color: var(--muted-foreground); font-size: 11px; white-space: nowrap; }
+@media (pointer: coarse) {
+  .aa-button { min-height: 36px; padding-inline: 7px; }
+  .aa-row { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aa-popover { animation: none !important; transition: none !important; }
+}
