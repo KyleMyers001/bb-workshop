@@ -24,10 +24,12 @@ bundles remain separate recovery copies; migration does not edit or delete
 them. Never push private history branches, `--all`, or `--mirror` to the public
 remote. Public GitHub clones cannot restore private original commit ancestry.
 
-All packages use one root workspace lockfile. The empty remote required an
-initial `bootstrap/workshop` branch as the PR base. The public migration lives
-on `feat/public-customization-monorepo`. Neither `main` nor `master` is used.
-Do not install from the empty bootstrap base.
+All packages use one root workspace lockfile. The initial public migration
+used `bootstrap/workshop` as its PR base and
+`feat/public-customization-monorepo` as its feature branch. That migration is
+complete. The stable default branch is now `main`, renamed from
+`bootstrap/workshop` without rewriting history. Use feature branches and pull
+requests for changes; never commit or push directly to `main` or `master`.
 
 ## Make a new source snapshot
 

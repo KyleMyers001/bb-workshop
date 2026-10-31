@@ -27,13 +27,12 @@ Requires Node 24+, npm with workspace support, and BB with SDK 0.6.104.
 dashboard also needs an existing `gh` login on the BB server machine, or its
 optional secret setting. The security dashboard uses the server's existing
 `gh` login with per-repository Dependabot permissions. Do not put credentials
-in this repository.
+in this repository. The stable default branch is `main`; make changes on
+feature branches and submit them through pull requests.
 
 ```sh
 git clone git@github.com:KyleMyers001/bb-workshop.git ~/Development/bb-workshop
 cd ~/Development/bb-workshop
-# Until the migration PR is merged, select its feature branch:
-git switch feat/public-customization-monorepo
 npm ci --include=dev
 npm run verify
 ```
