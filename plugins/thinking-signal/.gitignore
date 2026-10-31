@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+# Unused files emitted by the standard BB todo scaffold.
+components/
+hooks/
+lib/
+components.json
+PLUGIN_OVERVIEW.md
+skills/example-todos/

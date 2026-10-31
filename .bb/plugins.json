@@ -1,0 +1,11 @@
+{
+  "$schema": "https://getbb.app/schemas/plugins.schema.json",
+  "schemaVersion": 1,
+  "name": "bb-workshop",
+  "plugins": [
+    { "name": "archived-threads", "source": "./plugins/archived-threads" },
+    { "name": "delivery-dashboard", "source": "./plugins/delivery-dashboard" },
+    { "name": "skill-highlighting", "source": "./plugins/skill-highlighting" },
+    { "name": "thinking-signal", "source": "./plugins/thinking-signal" }
+  ]
+}
