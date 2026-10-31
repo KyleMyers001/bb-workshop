@@ -1,0 +1,258 @@
+/* Midnight Studio — Observatory's palette/input, clearer conversation reading.
+   Restore the previous theme: bb theme set midnight-observatory
+   Component selectors are verified against the installed BB UI, not a
+   versioned API. Recheck them after BB updates. No app-source changes. */
+
+:root,
+.light {
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "SF Mono", Menlo, monospace;
+  --font-terminal: "SF Mono", Menlo, monospace;
+
+  --canvas: #f5f3f0;
+  --ink: #292735;
+  --primary: #6b48bb;
+  --primary-foreground: #ffffff;
+  --muted-foreground: #625d70;
+  --subtle-foreground: #726b7f;
+  --readback-foreground: #686172;
+
+  --sidebar: #eae6ef;
+  --sidebar-foreground: #34303f;
+  --sidebar-accent: #ded6eb;
+  --sidebar-border: #d6cfdf;
+  --secondary: #e5deee;
+  --secondary-foreground: #383044;
+  --accent: #e9e3f1;
+  --accent-foreground: #383044;
+  --muted: #ebe6ef;
+  --border: #d9d2df;
+  --border-hairline: #e2dce7;
+  --border-seam: #d6cfdf;
+  --input: #a39aaf;
+  --state-hover: color-mix(in oklch, var(--primary) 8%, transparent);
+  --state-active: color-mix(in oklch, var(--primary) 13%, transparent);
+  --surface-selected: #e4d9f5;
+  --surface-selected-border: #a58acb;
+  --surface-recessed: #ebe7ee;
+  --surface-recessed-solid: #ebe7ee;
+  --surface-recessed-soft-solid: #f0ecf3;
+  --surface-raised: #fdfbff;
+  --surface-raised-solid: #fdfbff;
+  --timeline-accent: #8060c0;
+  --sidebar-search-match: #f0dfb6;
+  --sidebar-search-match-border: #9d762b;
+
+  --destructive: #b93f5a;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #a32d48;
+  --warning: #956119;
+  --warning-text: #855215;
+  --attention: #956119;
+  --success: #237657;
+  --diff-added: #237657;
+  --diff-removed: #ad3451;
+  --pr-merged: #7649b0;
+  --file-accent: #655096;
+
+  --observatory-heading: #443458;
+  --observatory-link: #6540ac;
+  --observatory-inline-code: #6e467b;
+  --observatory-focus-glow: color-mix(in oklch, var(--primary) 12%, transparent);
+  --observatory-chat-size: 15px;
+}
+
+.dark {
+  /* Graphite conversation, ink navigation, warm readable text. */
+  --canvas: #181923;
+  --ink: #eee9e2;
+  --primary: #b8a0ff;
+  --primary-foreground: #191326;
+  --muted-foreground: #b9b3c4;
+  --subtle-foreground: #a19aaa;
+  --readback-foreground: #aaa3b5;
+
+  --sidebar: #101119;
+  --sidebar-foreground: #e0dbe7;
+  --sidebar-accent: #252230;
+  --sidebar-border: #292734;
+  --secondary: #2d283a;
+  --secondary-foreground: #eee9e2;
+  --accent: #292533;
+  --accent-foreground: #eee9e2;
+  --muted: #25232f;
+  --border: #35313f;
+  --border-hairline: #2c2936;
+  --border-seam: #292734;
+  --input: #665a7a;
+  --surface-selected: #30263f;
+  --surface-selected-border: #8b6dba;
+  --surface-recessed: #12131c;
+  --surface-recessed-solid: #12131c;
+  --surface-recessed-soft-solid: #151620;
+  --surface-raised: #20202c;
+  --surface-raised-solid: #20202c;
+  --timeline-accent: #9f88ca;
+  --sidebar-search-match: #4a3d27;
+  --sidebar-search-match-border: #cda76a;
+
+  --destructive: #f18c9e;
+  --destructive-foreground: #25151a;
+  --destructive-text: #f6a0af;
+  --warning: #e8bd7c;
+  --warning-text: #e8bd7c;
+  --attention: #e8bd7c;
+  --success: #8bd5b1;
+  --diff-added: #8bd5b1;
+  --diff-removed: #f18c9e;
+  --pr-merged: #c4a5f4;
+  --file-accent: #c9b7ec;
+
+  --observatory-heading: #f5efe8;
+  --observatory-link: #c9b6ff;
+  --observatory-inline-code: #d4b5dd;
+
+  --ansi-0: #12131c;
+  --ansi-1: #f18c9e;
+  --ansi-2: #8bd5b1;
+  --ansi-3: #e8bd7c;
+  --ansi-4: #a4b8ee;
+  --ansi-5: #c4a5f4;
+  --ansi-6: #a0cfdb;
+  --ansi-7: #c7c0cf;
+  --ansi-8: #8d8599;
+  --ansi-9: #f6a0af;
+  --ansi-10: #a3e1c3;
+  --ansi-11: #f1d19e;
+  --ansi-12: #bccbf5;
+  --ansi-13: #d5bcff;
+  --ansi-14: #b7e0e9;
+  --ansi-15: #eee9e2;
+  --ansi-bg-fg-0: #eee9e2;
+  --ansi-bg-fg-1: #12131c;
+  --ansi-bg-fg-2: #12131c;
+  --ansi-bg-fg-3: #12131c;
+  --ansi-bg-fg-4: #12131c;
+  --ansi-bg-fg-5: #12131c;
+  --ansi-bg-fg-6: #12131c;
+  --ansi-bg-fg-7: #12131c;
+  --ansi-bg-fg-8: #12131c;
+  --ansi-bg-fg-9: #12131c;
+  --ansi-bg-fg-10: #12131c;
+  --ansi-bg-fg-11: #12131c;
+  --ansi-bg-fg-12: #12131c;
+  --ansi-bg-fg-13: #12131c;
+  --ansi-bg-fg-14: #12131c;
+  --ansi-bg-fg-15: #12131c;
+}
+
+/* Enlarge reading/input text, not navigation, controls, or terminal output. */
+[data-markdown-preview] {
+  font-size: var(--observatory-chat-size);
+  line-height: 1.75;
+}
+[data-markdown-preview] :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--observatory-heading);
+}
+[data-markdown-preview] strong { font-weight: 650; }
+[data-markdown-preview] a { color: var(--observatory-link); }
+[data-markdown-preview] :not(pre) > code {
+  color: var(--observatory-inline-code);
+}
+[data-promptbox-editor-scroll] { font-size: var(--observatory-chat-size); }
+
+/* Inset selection edge doesn't shift rows or cover thread actions. */
+.bb-sidebar-selected-row {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+/* Quiet at rest; a small violet halo only while composing. No animation. */
+[data-promptbox] {
+  background: var(--surface-raised-solid);
+  border-color: var(--border);
+}
+[data-promptbox]:focus-within {
+  border-color: var(--surface-selected-border);
+  box-shadow: 0 0 0 1px var(--surface-selected-border),
+    0 0 20px var(--observatory-focus-glow);
+}
+
+/* Hide provider-update nags; Settings → Updates and BB updates stay intact.
+   Remove this rule and reapply the theme to restore the footer pill. */
+[data-testid="sidebar-updates-badge-providers"] {
+  display: none !important;
+}
+
+/* Conversation reading — no composer or shell overrides below. */
+[data-message-column] [data-markdown-preview] {
+  font-size: 16px;
+  line-height: 1.78;
+  max-width: 74ch;
+  overflow-wrap: anywhere;
+}
+[data-message-column] [data-markdown-preview] h1 {
+  font-size: 1.9em;
+  line-height: 1.25;
+  letter-spacing: -.025em;
+  margin: 1.4em 0 .65em;
+}
+[data-message-column] [data-markdown-preview] h2 {
+  font-size: 1.55em;
+  line-height: 1.35;
+  letter-spacing: -.02em;
+  margin: 1.5em 0 .65em;
+}
+[data-message-column] [data-markdown-preview] h3 {
+  font-size: 1.18em;
+  line-height: 1.45;
+  letter-spacing: -.01em;
+  margin: 1.4em 0 .6em;
+  padding-bottom: .4em;
+  border-bottom: 1px solid var(--border-hairline);
+}
+[data-message-column] [data-markdown-preview] h1:first-child {
+  margin-top: 0;
+}
+[data-message-column] [data-markdown-preview] h2:first-child {
+  margin-top: 0;
+}
+[data-message-column] [data-markdown-preview] h3:first-child {
+  margin-top: 0;
+}
+[data-message-column] [data-markdown-preview] p {
+  margin: .85em 0;
+}
+[data-message-column] [data-markdown-preview] ul {
+  padding-inline-start: 1.5em;
+  margin: .85em 0;
+}
+[data-message-column] [data-markdown-preview] ol {
+  padding-inline-start: 1.5em;
+  margin: .85em 0;
+}
+[data-message-column] [data-markdown-preview] li {
+  padding-inline-start: .2em;
+  margin: .45em 0;
+}
+[data-message-column] [data-markdown-preview] li::marker {
+  color: var(--primary);
+}
+[data-message-column] [data-markdown-preview] li > p {
+  margin: .3em 0;
+}
+[data-message-column] [data-markdown-preview] blockquote {
+  margin: 1.4em 0;
+  padding: .75em 1.1em;
+  border-inline-start: 3px solid var(--timeline-accent);
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--primary) 5%, var(--background));
+}
+[data-message-column] [data-markdown-preview] blockquote > p {
+  margin: .3em 0;
+}
+[data-message-column] [data-markdown-preview] :not(pre) > code {
+  font-size: .86em;
+  border: 1px solid var(--border-hairline);
+  border-radius: 4px;
+  padding: .1em .3em;
+}

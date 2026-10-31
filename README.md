@@ -17,6 +17,8 @@ source repository, **not** a backup of BB's private configuration or runtime.
   and focused reading for Workbench documents.
 - `themes/midnight-observatory` and `themes/tokyo-night-storm`: standalone
   themes, independent of plugins.
+- `themes/midnight-studio`: opt-in Observatory variant with conversation-only
+  reading typography; the native composer and its fades stay unchanged.
 - `.bb/plugins.json`: BB's nine-plugin collection index.
 
 The original plugin IDs, engine ranges, and SDK **0.6.104** pins are retained.
