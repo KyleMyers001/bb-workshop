@@ -75,6 +75,31 @@ describe("Workbench library and reader", () => {
     expect(slot.container.querySelectorAll(".wb-document-meta")).toHaveLength(1);
   });
 
+  it("gives different code fences separate host cache identities", async () => {
+    const document = { ...read(first.path), content: '# Code blocks\n\n```ts\nconst short = 1;\n```\n\n```ts\nconst longer = {\n  value: 2,\n};\n```' };
+    const slot = await setup({ read: () => document });
+    await slot.findByRole("heading", { name: "Code blocks" });
+    const blocks = slot.getAllByTestId("bb-source-code");
+    expect(blocks.map(block => block.textContent)).toEqual(["const short = 1;", "const longer = {\n  value: 2,\n};"]);
+    const paths = blocks.map(block => block.getAttribute("data-path"));
+    expect(new Set(paths).size).toBe(2);
+    expect(paths.every(path => path?.endsWith(".ts"))).toBe(true);
+  });
+
+  it("keeps a fence identity stable until its content changes", async () => {
+    let document = { ...read(first.path), content: '# Code updates\n\n```ts\nconst value = 1;\n```' };
+    const slot = await setup({ read: () => document });
+    await slot.findByRole("heading", { name: "Code updates" });
+    const initialPath = slot.getByTestId("bb-source-code").getAttribute("data-path");
+    fireEvent.click(slot.getByRole("button", { name: "Focus ↗" }));
+    expect(slot.getByTestId("bb-source-code").getAttribute("data-path")).toBe(initialPath);
+    document = { ...document, content: '# Code updates\n\n```ts\nconst value = {\n  updated: true,\n};\n```' };
+    await slot.behavior.emitRealtime("library-changed", null);
+    await waitFor(() => expect(slot.getByTestId("bb-source-code").textContent).toContain("updated: true"));
+    expect(slot.getByTestId("bb-source-code").getAttribute("data-path")).not.toBe(initialPath);
+    expect(slot.getByTestId("bb-source-code").getAttribute("data-path")).toMatch(/\.ts$/);
+  });
+
   it("keeps title metadata beneath a filename fallback when the source has no H1", async () => {
     const slot = await setup({ read: ({ path }) => ({ ...read(path), content: "Plain Markdown content.", outline: [] }) });
     const title = await slot.findByRole("heading", { name: first.title });

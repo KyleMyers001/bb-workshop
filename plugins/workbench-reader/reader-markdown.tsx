@@ -1,4 +1,4 @@
-import { isValidElement, memo, useCallback, type ComponentProps, type ReactNode } from "react";
+import { isValidElement, memo, useCallback, useId, useState, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkFrontmatter from "remark-frontmatter";
@@ -22,6 +22,19 @@ function Image({ from, src, alt }: { from: string; src?: string; alt?: string })
     : <span className="wb-blocked-image">Image not loaded: {alt || "remote or unsupported image"}</span>;
 }
 
+function CodeBlock({ children }: { children?: ReactNode }) {
+  const id = useId();
+  const code = isValidElement<{ children?: ReactNode; className?: string }>(children) ? children.props : null;
+  const text = typeof code?.children === "string" ? code.children.replace(/\n$/, "") : null;
+  const [revision, setRevision] = useState({ text, number: 0 });
+  if (revision.text !== text) setRevision({ text, number: revision.number + 1 });
+  if (text === null) return <pre>{children}</pre>;
+  const language = code?.className?.match(/language-([\w+-]+)/)?.[1] ?? "txt";
+  // The host caches by path: isolate both separate fences and changed content.
+  return <div className="wb-code"><SourceCode content={text}
+    path={`workbench-${id}-${revision.number}.${language}`} overflow="scroll" /></div>;
+}
+
 // Outline updates should not rebuild the Markdown tree or disrupt keyboard focus.
 export const ReaderMarkdown = memo(function ReaderMarkdown({ content, path, onLink, titleId, titleMetadata }: {
   content: string; path: string; onLink: (href: string) => void;
@@ -43,12 +56,6 @@ export const ReaderMarkdown = memo(function ReaderMarkdown({ content, path, onLi
       input: ({ checked }) => <input type="checkbox" aria-label={checked ? "Completed task" : "Incomplete task"}
         checked={!!checked} disabled readOnly />,
       table: ({ children }) => <div className="wb-table"><table>{children}</table></div>,
-      pre: ({ children }) => {
-        if (!isValidElement<{ children?: ReactNode; className?: string }>(children)) return <pre>{children}</pre>;
-        const language = children.props.className?.match(/language-([\w+-]+)/)?.[1] ?? "txt";
-        const text = typeof children.props.children === "string" ? children.props.children.replace(/\n$/, "") : null;
-        return text === null ? <pre>{children}</pre> : <div className="wb-code"><SourceCode
-          content={text} path={`snippet.${language}`} overflow="scroll" /></div>;
-      },
+      pre: CodeBlock,
     }}>{content}</ReactMarkdown>;
 });
