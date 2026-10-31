@@ -8,7 +8,7 @@ export const moveSchema = z.object({
   note: z.string().trim().max(280).default(""),
 }).strict();
 export const listSchema = z.object({
-  projectId: id,
+  projectId: id.optional(),
   offset: z.number().int().min(0).default(0),
   limit: z.number().int().min(1).max(200).default(100),
 }).strict();

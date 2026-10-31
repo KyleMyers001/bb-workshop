@@ -1,7 +1,8 @@
 # BB Kanban
 
 A live Kanban panel where every card is an existing BB thread. Open **Kanban**
-in BB's navigation, select a project, and drag cards between **Backlog**,
+in BB's navigation to see **All projects**, or select a single project, and
+drag cards between **Backlog**,
 **In progress**, **Blocked**, **Review**, and **Done**. Each card also has a
 keyboard- and touch-accessible column selector. Select a title to open the
 thread through BB's navigation. Use **New thread** to open BB's composer.
@@ -42,9 +43,16 @@ receive the skill/tool at BB's next safe session configuration boundary.
 - Boards update over realtime, refresh on reconnection, and reconcile every
   30 seconds. Title and metadata changes outside this plugin appear by the
   next reconciliation. Refresh is also available manually.
-- The board loads 100 threads initially. **Load more threads** loads another
-  page; counts and search apply to loaded cards. Columns scroll horizontally
-  on narrow screens. Project selection resets when the panel is reopened.
+- **All projects** is the default selector option. Its cards show project names;
+  moving a card updates that thread within its own project. **New thread**
+  opens BB's composer without forcing a project; on a single-project board it
+  preselects that project. The CLI keeps its project-scoped defaults.
+- The board loads 100 threads initially across the selected scope. **Load more
+  threads** loads another page; counts and search apply to loaded cards.
+  Compact, flexible columns fit side by side on laptop-sized panels, with
+  wrapping controls rather than horizontal scrolling. Panels with 760px or
+  less of content width stack columns vertically, including when BB's sidebar
+  or a split reduces the available space. Reopening resets to All projects.
 
 ## Workspace development and installation
 

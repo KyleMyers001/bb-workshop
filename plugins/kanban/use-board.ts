@@ -3,7 +3,7 @@ import { useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-
 import type { rpcContract } from "./contract";
 import { BOARD_CHANGED, PAGE_SIZE, type Card, type Column } from "./model";
 
-export function useBoard(projectId: string) {
+export function useBoard(projectId?: string) {
   const rpc = useRpc<typeof rpcContract>();
   const connection = useRealtimeConnectionState();
   const [cards, setCards] = useState<Card[] | null>(null);
@@ -24,7 +24,7 @@ export function useBoard(projectId: string) {
     setRefreshing(true);
     try {
       const results = await Promise.all(Array.from({ length: pages }, (_, i) =>
-        rpc.call("board_list", { projectId, offset: i * PAGE_SIZE, limit: PAGE_SIZE })));
+        rpc.call("board_list", { ...(projectId ? { projectId } : {}), offset: i * PAGE_SIZE, limit: PAGE_SIZE })));
       if (!alive.current || request !== generation.current) return;
       const unique = new Map(results.flatMap(result => result.cards).map(card => [card.id, card]));
       setCards([...unique.values()]);
@@ -53,7 +53,7 @@ export function useBoard(projectId: string) {
     moveLock.current = true;
     setPending(card.id);
     try {
-      await rpc.call("card_move", { projectId, threadId: card.id, column });
+      await rpc.call("card_move", { projectId: card.projectId, threadId: card.id, column });
       if (!alive.current) return;
       setAnnouncement(`Moved ${card.title} to ${column.replaceAll("-", " ")}.`);
       await refresh();

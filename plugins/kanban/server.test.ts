@@ -20,7 +20,8 @@ async function setup() {
     sdk: {
       threads: {
         get: async () => thread,
-        list: async ({ offset = 0, limit = 100 }: any) => rows.slice(offset, offset + limit) as any,
+        list: async ({ projectId, offset = 0, limit = 100 }: any) =>
+          rows.filter(row => !projectId || row.projectId === projectId).slice(offset, offset + limit) as any,
         experimental_listPluginMetadata: async ({ threadIds }: any) => ({
           threads: threadIds.filter((id: string) => metadata.has(id)).map((threadId: string) => ({
             threadId, metadata: metadata.get(threadId)!,
@@ -48,6 +49,35 @@ describe("thread board", () => {
     expect(harness.inspection.sdk.callsTo("threads.list")[0]).toMatchObject([
       { projectId: "proj_one", archived: false, includeHidden: false },
     ]);
+  });
+
+  it("lists all projects when no project filter is supplied", async () => {
+    const { harness, thread, setRows } = await setup();
+    setRows([thread, { ...thread, id: "thr_two", projectId: "proj_two" }]);
+    const result: any = await harness.behavior.callRpc("board_list", {});
+    expect(result.cards.map((card: any) => card.projectId)).toEqual(["proj_one", "proj_two"]);
+    expect(harness.inspection.sdk.callsTo("threads.list")[0]?.[0]).not.toHaveProperty("projectId");
+    const scoped: any = await harness.behavior.callRpc("board_list", { projectId: "proj_two" });
+    expect(scoped.cards.map((card: any) => card.id)).toEqual(["thr_two"]);
+  });
+
+  it("paginates globally across projects and retains persisted columns", async () => {
+    const { harness, metadata, thread, setRows } = await setup();
+    setRows(Array.from({ length: 103 }, (_, i) => ({ ...thread, id: `thr_${i}`, projectId: i % 2 ? "proj_one" : "proj_two" })));
+    metadata.set("thr_100", { column: "blocked", note: "Needs input" });
+    const first: any = await harness.behavior.callRpc("board_list", {});
+    const next: any = await harness.behavior.callRpc("board_list", { offset: 100 });
+    expect(first.cards).toHaveLength(100);
+    expect(first.hasMore).toBe(true);
+    expect(next.cards).toHaveLength(3);
+    expect(next.hasMore).toBe(false);
+    expect(next.cards[0]).toMatchObject({ projectId: "proj_two", column: "blocked", note: "Needs input" });
+  });
+
+  it("still requires a project for moves and rejects empty list filters", async () => {
+    const { harness } = await setup();
+    await expect(harness.behavior.callRpc("card_move", { threadId: "thr_one", column: "done" })).rejects.toThrow();
+    await expect(harness.behavior.callRpc("board_list", { projectId: "" })).rejects.toThrow();
   });
 
   it("persists a move atomically and broadcasts after the write", async () => {
