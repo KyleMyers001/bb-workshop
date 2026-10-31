@@ -1,0 +1,26 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.DS_Store
+
+# Local credentials and runtime state never belong in source control.
+.env
+.env.*
+*.pem
+*.key
+credentials*
+secrets/
+*.db
+*.db-*
+*.sqlite*
+.bb/*
+!.bb/plugins.json
+
+# Keep recovery evidence and snapshots outside this public repository.
+*.bundle
+*.log
+*.jsonl
+backups/
+sessions/
+recovery-evidence/

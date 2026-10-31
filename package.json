@@ -1,0 +1,22 @@
+{
+  "name": "bb-workshop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "workspaces": ["plugins/*"],
+  "scripts": {
+    "test": "npm run test:scripts && npm run test --workspaces",
+    "test:scripts": "node --experimental-strip-types --test scripts/*.test.ts",
+    "typecheck": "tsc --noEmit && npm run typecheck --workspaces",
+    "sdk:check": "npm run sdk:check --workspaces",
+    "build": "npm run build --workspaces",
+    "verify": "npm test && npm run typecheck && npm run sdk:check && npm run build",
+    "install:local": "node --experimental-strip-types scripts/install.ts",
+    "backup": "node --experimental-strip-types scripts/backup.ts"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3"
+  }
+}

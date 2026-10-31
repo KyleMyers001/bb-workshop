@@ -1,0 +1,8 @@
+.skill-highlighting-token {
+  color: var(--primary);
+  background-color: color-mix(in srgb, var(--primary) 14%, transparent);
+  border-radius: 3px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--primary) 45%, transparent);
+  text-underline-offset: 3px;
+}

@@ -1,0 +1,200 @@
+/* Tokyo Night Storm (dark) + Tokyo Night Day (light) for bb. */
+
+:root,
+.light {
+  /* Tokyo Night Day */
+  --canvas: #e1e2e7;
+  --ink: #3760bf;
+  --primary: #2e7de9;
+  --primary-foreground: #ffffff;
+
+  --muted-foreground: #4f5f9e;
+  --subtle-foreground: #68709a;
+  --readback-foreground: #6172b0;
+
+  /* Surfaces: Day's own palette instead of ink-into-canvas grey mixes */
+  --sidebar: #d0d5e3;
+  --sidebar-accent: #c4c8da;
+  --sidebar-border: #b6bcd4;
+  --secondary: #b7c1e3;
+  --secondary-foreground: #2e5aa8;
+  --accent: #c4c8da;
+  --accent-foreground: #3760bf;
+  --muted: #c9cfe4;
+  --border: #b6bcd4;
+  --border-hairline: #b6bcd4;
+  --border-seam: #c4c8da;
+  --input: #a8aecb;
+  --state-hover: color-mix(in oklab, #2e7de9 10%, transparent);
+  --state-active: color-mix(in oklab, #2e7de9 18%, transparent);
+  --surface-recessed: #d0d5e3;
+  --surface-recessed-solid: #d0d5e3;
+  --surface-recessed-soft-solid: #d6dae6;
+  --surface-raised: #e9e9ed;
+  --surface-raised-solid: #e9e9ed;
+  --surface-selected: color-mix(in oklab, #2e7de9 18%, transparent);
+  --surface-selected-border: color-mix(in oklab, #2e7de9 45%, transparent);
+  --timeline-accent: #2e7de9;
+  --sidebar-search-match: #e8d7b4;
+  --sidebar-search-match-border: #c9a869;
+
+  /* Markdown accents (custom, used by the rules at the bottom) */
+  --md-h1: #b15c00;
+  --md-h2: #8c6c3e;
+  --md-h3: #2e7de9;
+  --md-h4: #9854f1;
+  --md-strong: #007197;
+  --md-em: #9854f1;
+  --md-code: #587539;
+  --md-link: #2e7de9;
+
+  --destructive: #f52a65;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #b8264f;
+  --warning: #b15c00;
+  --warning-text: #8f4b00;
+  --attention: #b15c00;
+  --success: #587539;
+  --diff-added: #587539;
+  --diff-removed: #c4284f;
+  --pr-merged: #9854f1;
+  --file-accent: #007197;
+
+  --ansi-0: #e9e9ed;
+  --ansi-1: #f52a65;
+  --ansi-2: #587539;
+  --ansi-3: #8c6c3e;
+  --ansi-4: #2e7de9;
+  --ansi-5: #9854f1;
+  --ansi-6: #007197;
+  --ansi-7: #6172b0;
+  --ansi-8: #a1a6c5;
+  --ansi-9: #f52a65;
+  --ansi-10: #587539;
+  --ansi-11: #8c6c3e;
+  --ansi-12: #2e7de9;
+  --ansi-13: #9854f1;
+  --ansi-14: #007197;
+  --ansi-15: #3760bf;
+
+  --ansi-bg-fg-0: #3760bf;
+  --ansi-bg-fg-1: #ffffff;
+  --ansi-bg-fg-2: #ffffff;
+  --ansi-bg-fg-3: #ffffff;
+  --ansi-bg-fg-4: #ffffff;
+  --ansi-bg-fg-5: #ffffff;
+  --ansi-bg-fg-6: #ffffff;
+  --ansi-bg-fg-7: #ffffff;
+  --ansi-bg-fg-8: #1f2335;
+  --ansi-bg-fg-9: #ffffff;
+  --ansi-bg-fg-10: #ffffff;
+  --ansi-bg-fg-11: #ffffff;
+  --ansi-bg-fg-12: #ffffff;
+  --ansi-bg-fg-13: #ffffff;
+  --ansi-bg-fg-14: #ffffff;
+  --ansi-bg-fg-15: #ffffff;
+}
+
+.dark {
+  /* Tokyo Night Storm */
+  --canvas: #24283b;
+  --ink: #c0caf5;
+  --primary: #7aa2f7;
+  --primary-foreground: #1f2335;
+
+  --muted-foreground: #a9b1d6;
+  --subtle-foreground: #737aa2;
+  --readback-foreground: #8e96c0;
+
+  /* Surfaces: Storm's own palette instead of ink-into-canvas grey mixes */
+  --sidebar: #1f2335;
+  --sidebar-accent: #292e42;
+  --sidebar-border: #1b1e2d;
+  --secondary: #394b70;
+  --secondary-foreground: #c0caf5;
+  --accent: #292e42;
+  --accent-foreground: #c0caf5;
+  --muted: #2f344d;
+  --border: #3b4261;
+  --border-hairline: #3b4261;
+  --border-seam: #1b1e2d;
+  --input: #414868;
+  --state-hover: color-mix(in oklab, #7aa2f7 10%, transparent);
+  --state-active: color-mix(in oklab, #7aa2f7 18%, transparent);
+  --surface-recessed: #1f2335;
+  --surface-recessed-solid: #1f2335;
+  --surface-recessed-soft-solid: #222639;
+  --surface-raised: #292e42;
+  --surface-raised-solid: #292e42;
+  --surface-selected: #2e3c64;
+  --surface-selected-border: #3d59a1;
+  --timeline-accent: #7aa2f7;
+  --sidebar-search-match: #4a4533;
+  --sidebar-search-match-border: #e0af68;
+
+  --md-h1: #ff9e64;
+  --md-h2: #e0af68;
+  --md-h3: #7aa2f7;
+  --md-h4: #bb9af7;
+  --md-strong: #7dcfff;
+  --md-em: #bb9af7;
+  --md-code: #9ece6a;
+  --md-link: #7aa2f7;
+
+  --destructive: #f7768e;
+  --destructive-foreground: #1f2335;
+  --destructive-text: #f7768e;
+  --warning: #ff9e64;
+  --warning-text: #ff9e64;
+  --attention: #e0af68;
+  --success: #9ece6a;
+  --diff-added: #9ece6a;
+  --diff-removed: #f7768e;
+  --pr-merged: #bb9af7;
+  --file-accent: #7dcfff;
+
+  --ansi-0: #1d202f;
+  --ansi-1: #f7768e;
+  --ansi-2: #9ece6a;
+  --ansi-3: #e0af68;
+  --ansi-4: #7aa2f7;
+  --ansi-5: #bb9af7;
+  --ansi-6: #7dcfff;
+  --ansi-7: #a9b1d6;
+  --ansi-8: #414868;
+  --ansi-9: #f7768e;
+  --ansi-10: #9ece6a;
+  --ansi-11: #e0af68;
+  --ansi-12: #7aa2f7;
+  --ansi-13: #bb9af7;
+  --ansi-14: #7dcfff;
+  --ansi-15: #c0caf5;
+
+  --ansi-bg-fg-0: #c0caf5;
+  --ansi-bg-fg-1: #1d202f;
+  --ansi-bg-fg-2: #1d202f;
+  --ansi-bg-fg-3: #1d202f;
+  --ansi-bg-fg-4: #1d202f;
+  --ansi-bg-fg-5: #1d202f;
+  --ansi-bg-fg-6: #1d202f;
+  --ansi-bg-fg-7: #1d202f;
+  --ansi-bg-fg-8: #c0caf5;
+  --ansi-bg-fg-9: #1d202f;
+  --ansi-bg-fg-10: #1d202f;
+  --ansi-bg-fg-11: #1d202f;
+  --ansi-bg-fg-12: #1d202f;
+  --ansi-bg-fg-13: #1d202f;
+  --ansi-bg-fg-14: #1d202f;
+  --ansi-bg-fg-15: #1d202f;
+}
+
+/* Obsidian-style markdown accents in chat and markdown previews */
+[data-markdown-preview] h1 { color: var(--md-h1); }
+[data-markdown-preview] h2 { color: var(--md-h2); }
+[data-markdown-preview] h3 { color: var(--md-h3); }
+[data-markdown-preview] :is(h4, h5, h6) { color: var(--md-h4); }
+[data-markdown-preview] strong { color: var(--md-strong); font-weight: 600; }
+[data-markdown-preview] em { color: var(--md-em); }
+[data-markdown-preview] :not(pre) > code { color: var(--md-code); }
+[data-markdown-preview] a { color: var(--md-link); }
+[data-markdown-preview] th { color: var(--md-h3); }

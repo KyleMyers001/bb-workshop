@@ -1,0 +1,89 @@
+.delivery-dashboard {
+  --velocity-mint: #14b8a6;
+  --velocity-sky: #38bdf8;
+  --velocity-violet: #a78bfa;
+  --velocity-amber: #fbbf24;
+  --velocity-rose: #fb7185;
+  width: 100%; min-width: 0; padding-bottom: 2rem;
+}
+.velocity-page { background: var(--background); }
+.delivery-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.velocity-page-label { font-size: 1.35rem; font-weight: 650; letter-spacing: -.035em; margin-bottom: .3rem; }
+.velocity-range-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .6rem; margin: 1.5rem 0; }
+.velocity-range-control { display: inline-flex; padding: 4px; gap: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--muted); }
+.velocity-range-control button { padding: .5rem 1rem; border-radius: 7px; font-size: .8rem; color: var(--muted-foreground); cursor: pointer; }
+.velocity-range-control button:hover { color: var(--foreground); background: var(--background); }
+.velocity-range-control button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: 0 1px 4px #0002; font-weight: 600; }
+.velocity-window-label, .velocity-contributor-count { color: var(--muted-foreground); font-size: .75rem; }
+.delivery-person-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+.velocity-identity { display: flex; align-items: center; gap: .75rem; }
+.velocity-avatar { display: grid; place-items: center; height: 40px; width: 40px; border-radius: 12px; background: color-mix(in srgb, var(--velocity-violet) 18%, var(--card)); color: color-mix(in srgb, var(--foreground) 65%, var(--velocity-violet)); font-weight: 700; font-size: 1.1rem; border: 1px solid color-mix(in srgb, var(--velocity-violet) 30%, var(--border)); }
+.velocity-identity h2 { font-size: .95rem; font-weight: 600; }
+.velocity-identity p { font-size: .75rem; color: var(--muted-foreground); margin-top: 2px; }
+.velocity-contributor-count { border: 1px solid var(--border); border-radius: 99px; padding: .3rem .65rem; }
+.delivery-select { padding: .45rem .6rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--card); color: var(--foreground); }
+.delivery-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; margin: 1rem 0 1.5rem; }
+.delivery-metric { --metric-accent: var(--velocity-mint); position: relative; min-width: 0; padding: 1rem 1.1rem; overflow-wrap: anywhere; border-radius: 12px; border: 1px solid var(--border); background: color-mix(in srgb, var(--metric-accent) 4%, var(--card)); overflow: hidden; }
+.delivery-metric::before { content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; background: var(--metric-accent); border-radius: 0 3px 3px 0; }
+.delivery-metric:nth-child(2) { --metric-accent: var(--velocity-sky); }
+.delivery-metric:nth-child(3) { --metric-accent: var(--velocity-violet); }
+.delivery-metric:nth-child(4) { --metric-accent: var(--velocity-amber); }
+.delivery-metric:nth-child(5) { --metric-accent: var(--velocity-rose); }
+.delivery-metric:nth-child(6) { --metric-accent: var(--velocity-sky); }
+.delivery-metric dt { display: flex; align-items: center; gap: .5rem; font-size: .8rem; }
+.velocity-metric-icon { display: grid; place-items: center; flex-shrink: 0; height: 28px; width: 28px; border-radius: 8px; background: color-mix(in srgb, var(--metric-accent) 14%, var(--card)); color: color-mix(in srgb, var(--foreground) 65%, var(--metric-accent)); }
+.velocity-metric-icon svg { width: 16px; height: 16px; }
+.delivery-value { margin: .6rem 0 .4rem; font-size: 2rem; line-height: 1.1; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.045em; }
+.delivery-unit { margin-left: .25rem; font-size: .9rem; font-weight: 400; letter-spacing: normal; color: var(--muted-foreground); }
+.delivery-empty { padding: 1rem; border: 1px dashed var(--border); border-radius: .6rem; margin: .75rem 0; }
+.velocity-chart { padding: 1.1rem 1.25rem .9rem; border: 1px solid var(--border); border-radius: 14px; background: var(--card); box-shadow: 0 4px 24px #00000006; }
+.velocity-chart-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .7rem; }
+.velocity-chart-heading h2 { font-size: .95rem; font-weight: 600; }
+.velocity-chart-heading p { font-size: .75rem; color: var(--muted-foreground); margin-top: .2rem; }
+.velocity-chart-key { display: flex; align-items: center; gap: .4rem; font-size: .75rem; color: var(--muted-foreground); }
+.velocity-chart-key span { height: 3px; width: 18px; background: var(--velocity-mint); border-radius: 5px; }
+.velocity-chart-readout { min-height: 2rem; margin-top: 1rem; font-size: .85rem; }
+.velocity-chart-readout strong { font-size: 1.2rem; font-variant-numeric: tabular-nums; margin-right: .15rem; }
+.velocity-chart-readout span { color: var(--muted-foreground); font-size: .75rem; }
+.velocity-plot { display: block; width: 100%; height: auto; overflow: visible; }
+.velocity-gridline { stroke: var(--border); stroke-dasharray: 3 5; }
+.velocity-axis { fill: var(--muted-foreground); font-size: 11px; }
+.velocity-line { fill: none; stroke: var(--velocity-mint); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.velocity-point { fill: var(--velocity-mint); stroke: var(--card); stroke-width: 2; }
+.velocity-cursor { stroke: var(--velocity-mint); opacity: .35; stroke-dasharray: 4 4; }
+.velocity-plot rect:focus-visible { outline: 2px solid var(--velocity-mint); outline-offset: -2px; }
+.velocity-chart-footer { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; padding-top: .6rem; border-top: 1px solid var(--border); font-size: .7rem; color: var(--muted-foreground); }
+.velocity-live-dot { height: 6px; width: 6px; background: var(--velocity-mint); border-radius: 50%; }
+.velocity-chart-footer details { margin-left: auto; }
+.velocity-chart-footer details[open] { width: 100%; overflow-x: auto; }
+.velocity-chart-footer table { width: 100%; text-align: left; margin-top: .5rem; }
+.velocity-chart-footer th, .velocity-chart-footer td { padding: .4rem; border-top: 1px solid var(--border); white-space: nowrap; }
+.velocity-chart-empty { display: grid; place-items: center; min-height: 240px; text-align: center; color: var(--muted-foreground); font-size: .85rem; }
+.velocity-loading { text-align: center; color: var(--muted-foreground); padding: 2rem 0; font-size: .85rem; }
+.velocity-loading-chart { height: 260px; border: 1px solid var(--border); border-radius: 14px; background: var(--muted); margin-bottom: 1rem; }
+.delivery-context { padding: .85rem 0; margin-top: 1rem; border-top: 1px solid var(--border); }
+.delivery-dashboard summary { cursor: pointer; }
+.delivery-dashboard summary:focus-visible, .velocity-range-control button:focus-visible, .delivery-select:focus-visible, .delivery-comparison:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.delivery-comparison { max-width: 100%; overflow-x: auto; margin: 0 0 1rem; border: 1px solid var(--border); border-radius: 12px; padding: .8rem; }
+.delivery-comparison table { width: 100%; border-collapse: collapse; text-align: left; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.delivery-comparison caption { text-align: left; margin-bottom: .5rem; }
+.delivery-comparison th, .delivery-comparison td { padding: .6rem; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.delivery-comparison thead { color: var(--muted-foreground); }
+@media (max-width: 700px) {
+  .delivery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .velocity-chart-readout span { display: none; }
+}
+@media (max-width: 440px) {
+  .delivery-toolbar { align-items: flex-start; }
+  .velocity-page-label { font-size: 1.15rem; }
+  .delivery-grid { gap: .6rem; }
+  .delivery-metric { padding: .8rem; }
+  .delivery-metric dt { align-items: flex-start; font-size: .75rem; }
+  .velocity-metric-icon { width: 23px; height: 23px; border-radius: 6px; }
+  .delivery-value { font-size: 1.7rem; }
+  .delivery-metric p { font-size: .7rem; }
+  .velocity-range-control { width: 100%; }
+  .velocity-range-control button { flex: 1; padding: .5rem .45rem; }
+  .velocity-chart { padding: .9rem; }
+  .velocity-chart-heading { align-items: flex-start; }
+}
