@@ -1,9 +1,10 @@
 import { COLUMNS, type Card, type Column } from "./model";
 
-export function BoardCard({ card, disabled, providerName, onOpen, onMove, onDrag, onDragEnd }: {
+export function BoardCard({ card, disabled, providerName, projectName, onOpen, onMove, onDrag, onDragEnd }: {
   card: Card;
   disabled: boolean;
   providerName: string;
+  projectName?: string;
   onOpen: () => void;
   onMove: (column: Column) => void;
   onDrag: (id: string) => void;
@@ -23,6 +24,7 @@ export function BoardCard({ card, disabled, providerName, onOpen, onMove, onDrag
           {card.runtimeStatus.replaceAll("-", " ")}
         </span>
       </div>
+      {projectName && <p className="kanban-card-project">{projectName}</p>}
       <button type="button" className="kanban-card-title" onClick={onOpen}>
         {card.title}
       </button>

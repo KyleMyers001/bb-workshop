@@ -11,7 +11,8 @@ const actorSchema = z.enum(["agent", "user", "cli"]);
 export function createBoard(bb: BbPluginApi) {
   async function list({ projectId, offset, limit }: ListInput) {
     const rows = await bb.sdk.threads.list({
-      projectId, archived: false, includeHidden: false, offset, limit: limit + 1,
+      ...(projectId ? { projectId } : {}),
+      archived: false, includeHidden: false, offset, limit: limit + 1,
     });
     const visible = rows.slice(0, limit);
     const metadata = visible.length === 0 ? [] : (

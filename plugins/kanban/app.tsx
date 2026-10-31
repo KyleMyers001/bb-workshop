@@ -8,7 +8,10 @@ import { BoardCard } from "./board-card";
 import { useBoard } from "./use-board";
 import "./app.css";
 
-function ProjectBoard({ projectId }: { projectId: string }) {
+function ProjectBoard({ projectId, projects }: {
+  projectId?: string;
+  projects: Array<{ id: string; name: string }>;
+}) {
   const board = useBoard(projectId);
   const navigate = useBbNavigate();
   const { providers } = experimental_useProviders();
@@ -26,7 +29,7 @@ function ProjectBoard({ projectId }: { projectId: string }) {
         {board.connection !== "connected" && " · Reconnecting…"}
       </span>
       <button type="button" disabled={board.refreshing} onClick={() => void board.refresh()}>Refresh</button>
-      <button type="button" className="kanban-new" onClick={() => navigate.toCompose({ projectId, focusPrompt: true })}>New thread</button>
+      <button type="button" className="kanban-new" onClick={() => navigate.toCompose({ ...(projectId ? { projectId } : {}), focusPrompt: true })}>New thread</button>
     </div>
     {board.error && <div role="alert" className="kanban-error">{board.error}{" "}
       <button type="button" onClick={() => void board.refresh()}>Retry</button></div>}
@@ -56,6 +59,7 @@ function ProjectBoard({ projectId }: { projectId: string }) {
           <div className="kanban-column-cards">
             {cards.map(card => <BoardCard key={card.id} card={card}
               disabled={board.pending !== null}
+              projectName={!projectId ? projects.find(project => project.id === card.projectId)?.name ?? card.projectId : undefined}
               providerName={providers.find(provider => provider.id === card.providerId)?.displayName ?? card.providerId}
               onOpen={() => navigate.toThread(card.id, { split: true })}
               onMove={next => void board.move(card, next)}
@@ -84,8 +88,7 @@ export function KanbanPage() {
     rpc.call("projects_list").then(result => {
       if (cancelled) return;
       setProjects(result.projects); setError(null);
-      setSelected(current => result.projects.some(project => project.id === current)
-        ? current : result.projects[0]?.id ?? "");
+      setSelected(current => result.projects.some(project => project.id === current) ? current : "");
     }, cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause)); });
     return () => { cancelled = true; };
   }, [rpc, retry]);
@@ -95,13 +98,14 @@ export function KanbanPage() {
       <select id="kanban-project" value={selected} onChange={event => setSelected(event.target.value)}>
         {projects === null && <option value="">Loading projects…</option>}
         {projects?.length === 0 && <option value="">No projects</option>}
+        {!!projects?.length && <option value="">All projects</option>}
         {projects?.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
       </select>
       <span className="kanban-project-caption">One thread. One card.</span>
     </div>
     {error && <div role="alert" className="kanban-error">{error}{" "}
       <button type="button" onClick={() => setRetry(value => value + 1)}>Retry</button></div>}
-    {selected ? <ProjectBoard key={selected} projectId={selected} />
+    {projects && projects.length > 0 ? <ProjectBoard key={selected} projectId={selected || undefined} projects={projects} />
       : <p className="kanban-hint">{projects === null ? "Loading board…" : "Create a project to start tracking threads."}</p>}
   </div>;
 }
