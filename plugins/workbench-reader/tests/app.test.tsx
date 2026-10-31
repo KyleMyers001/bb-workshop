@@ -68,6 +68,29 @@ describe("Workbench library and reader", () => {
     expect(slot.container.querySelector(".wb-is-focused")).toBeNull();
   });
 
+  it("places document dates directly beneath the first title, without duplicating them", async () => {
+    const slot = await setup();
+    const title = await slot.findByRole("heading", { name: first.title });
+    expect(title.nextElementSibling?.classList.contains("wb-document-meta")).toBe(true);
+    expect(slot.container.querySelectorAll(".wb-document-meta")).toHaveLength(1);
+  });
+
+  it("keeps title metadata beneath a filename fallback when the source has no H1", async () => {
+    const slot = await setup({ read: ({ path }) => ({ ...read(path), content: "Plain Markdown content.", outline: [] }) });
+    const title = await slot.findByRole("heading", { name: first.title });
+    expect(title.nextElementSibling?.classList.contains("wb-document-meta")).toBe(true);
+    expect(slot.container.querySelectorAll(".wb-document h1")).toHaveLength(1);
+  });
+
+  it("collapses the source bar in Focus while keeping Refresh and Back available", async () => {
+    const slot = await setup(); await slot.findByRole("heading", { name: first.title });
+    fireEvent.click(slot.getByRole("button", { name: "Focus ↗" }));
+    expect(slot.queryByText("Server · /example/Workbench")).toBeNull();
+    expect(slot.getAllByRole("button", { name: "Refresh" })).toHaveLength(1);
+    fireEvent.click(slot.getByRole("button", { name: "← Back to library" }));
+    expect(slot.getByText("Server · /example/Workbench")).toBeTruthy();
+  });
+
   it("loads subsequent pages without dropping or duplicating earlier results", async () => {
     const documents = Array.from({ length: 51 }, (_, i) => ({ ...first, path: `Plans/item-${i}.md`, title: `Item ${i}` }));
     const slot = await setup({ search: ({ offset, limit }) => page({ documents: documents.slice(offset, offset + limit), total: 51, hasMore: offset + limit < 51 }) });

@@ -64,9 +64,15 @@ a bounded, validated plugin endpoint. PNG, JPEG, GIF, and WebP are supported;
 SVG and remote/data images are not loaded. Raw HTML is skipped, not executed.
 External HTTP(S) links use BB's normal link behavior.
 
-Focus mode retains search/filter state. Its outline supports keyboard use and
-becomes a heading selector at compact widths. Document selections use BB's own
-panel navigation so direct links and browser back/forward work.
+Reading typography, headings, tables, quotes, list markers, and inline code use
+BB's existing theme tokens; no alternate palette or global appearance setting
+is introduced. Dates sit beneath the document title.
+
+Focus mode retains search/filter state and removes the extra server-path bar;
+Back and Refresh remain in its toolbar. The outline follows the current section,
+supports keyboard use, and becomes a synchronized heading selector at compact
+widths. It recalculates when images or layout change. Document selections use
+BB's own panel navigation so direct links and browser back/forward work.
 
 This replaces finding and reading artifacts, not the whole Obsidian application.
 Quick find, editing, graphs, PDF/HTML viewing, wiki embeds, synchronization, and

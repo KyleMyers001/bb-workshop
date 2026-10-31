@@ -1,4 +1,4 @@
-import { isValidElement, type ReactNode } from "react";
+import { isValidElement, memo, useCallback, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkFrontmatter from "remark-frontmatter";
@@ -22,11 +22,16 @@ function Image({ from, src, alt }: { from: string; src?: string; alt?: string })
     : <span className="wb-blocked-image">Image not loaded: {alt || "remote or unsupported image"}</span>;
 }
 
-export function ReaderMarkdown({ content, path, onLink }: {
+// Outline updates should not rebuild the Markdown tree or disrupt keyboard focus.
+export const ReaderMarkdown = memo(function ReaderMarkdown({ content, path, onLink, titleId, titleMetadata }: {
   content: string; path: string; onLink: (href: string) => void;
+  titleId?: string; titleMetadata?: ReactNode;
 }) {
+  const Title = useCallback(({ id, children }: ComponentProps<"h1">) =>
+    <><h1 id={id}>{children}</h1>{id === titleId && titleMetadata}</>, [titleId, titleMetadata]);
   return <ReactMarkdown skipHtml remarkPlugins={[remarkGfm, remarkFrontmatter, readerRemark]}
     urlTransform={url => url} components={{
+      h1: Title,
       a: ({ href, children }) => {
         if (!href) return <span>{children}</span>;
         if (/^https?:\/\//i.test(href)) return <UrlLink href={href} rel="noopener noreferrer" referrerPolicy="no-referrer">{children}</UrlLink>;
@@ -46,4 +51,4 @@ export function ReaderMarkdown({ content, path, onLink }: {
           content={text} path={`snippet.${language}`} overflow="scroll" /></div>;
       },
     }}>{content}</ReactMarkdown>;
-}
+});

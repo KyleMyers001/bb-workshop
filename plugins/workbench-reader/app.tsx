@@ -57,10 +57,11 @@ export function WorkbenchPage({ subPath }: { subPath: string }) {
   const isFiltered = !!library.query.trim() || !!library.folder;
   const folderPicker = <><option value="">All documents</option>{folders.map(folder =>
     <option key={folder.name} value={folder.name}>{folder.name} ({folder.count})</option>)}</>;
+  const refreshControl = <button type="button" disabled={library.refreshing || library.loading}
+    onClick={() => void library.refresh()}>{library.refreshing ? "Indexing…" : "Refresh"}</button>;
   return <div className={`wb-page${location.focus ? " wb-is-focused" : ""}`}>
-    <header className="wb-source-bar"><span className="wb-source-path" title={library.data?.root}>Server · {library.data?.root ?? "Workbench"}</span>
-      <span className="wb-read-only">Read only</span><button type="button" disabled={library.refreshing || library.loading}
-        onClick={() => void library.refresh()}>{library.refreshing ? "Indexing…" : "Refresh"}</button></header>
+    {!location.focus && <header className="wb-source-bar"><span className="wb-source-path" title={library.data?.root}>Server · {library.data?.root ?? "Workbench"}</span>
+      <span className="wb-read-only">Read only</span>{refreshControl}</header>}
     {library.connection !== "connected" && <p className="wb-notice" role="status">Reconnecting to BB. Results may be out of date.</p>}
     {(library.error || linkError) && <div className="wb-error" role="alert">{linkError ?? library.error} <button type="button"
       onClick={() => { if (linkError) setLinkError(null); else library.retry(); }}>{linkError ? "Dismiss" : "Retry"}</button></div>}
@@ -100,6 +101,7 @@ export function WorkbenchPage({ subPath }: { subPath: string }) {
         </div>
       </section>
       <DocumentReader document={reader.document} error={reader.error} path={location.path} focus={location.focus} anchor={location.anchor}
+        toolbarActions={location.focus ? refreshControl : undefined}
         onFocus={() => location.path && open(location.path, true)} onBack={() => location.path && open(location.path, false)}
         onLink={href => void follow(href)} onRetry={reader.retry} />
     </div>
