@@ -9,11 +9,12 @@ source repository, **not** a backup of BB's private configuration or runtime.
 - `plugins/archived-threads`: read-only archived conversation navigation.
 - `plugins/delivery-dashboard`: GitHub activity and contributor comparisons.
 - `plugins/kanban`: project Kanban boards with agent-managed thread cards.
+- `plugins/security-dashboard`: team Dependabot inbox with an explicit repository watch list.
 - `plugins/skill-highlighting`: paint-only slash-skill syntax highlighting.
 - `plugins/thinking-signal`: theme-colored sidebar working indicator.
 - `themes/midnight-observatory` and `themes/tokyo-night-storm`: standalone
   themes, independent of plugins.
-- `.bb/plugins.json`: BB's six-plugin collection index.
+- `.bb/plugins.json`: BB's seven-plugin collection index.
 
 The original plugin IDs, engine ranges, and SDK **0.6.104** pins are retained.
 There is no shared runtime library. Each plugin owns its manifest and tests;
@@ -22,9 +23,11 @@ all npm dependencies resolve through one root lockfile.
 ## Setup and verification
 
 Requires Node 24+, npm with workspace support, and BB with SDK 0.6.104.
-`bb` must be on PATH; SDK checks/builds use that installed BB. The dashboard
-also needs an existing `gh` login on the BB server machine, or its optional
-secret setting. Do not put credentials in this repository.
+`bb` must be on PATH; SDK checks/builds use that installed BB. The delivery
+dashboard also needs an existing `gh` login on the BB server machine, or its
+optional secret setting. The security dashboard uses the server's existing
+`gh` login with per-repository Dependabot permissions. Do not put credentials
+in this repository.
 
 ```sh
 git clone git@github.com:KyleMyers001/bb-workshop.git ~/Development/bb-workshop
@@ -36,7 +39,7 @@ npm run verify
 ```
 
 `verify` runs script tests, every plugin's tests, root/plugin typechecks,
-every plugin's SDK-pin check, and all six builds. Individual aggregates are
+every plugin's SDK-pin check, and all seven builds. Individual aggregates are
 `npm test`, `npm run typecheck`, `npm run sdk:check`, and `npm run build`.
 To work on one package, for example:
 
@@ -70,6 +73,7 @@ verification again **before** reinstalling the same IDs from:
 ~/Development/bb-workshop/plugins/archived-threads
 ~/Development/bb-workshop/plugins/delivery-dashboard
 ~/Development/bb-workshop/plugins/kanban
+~/Development/bb-workshop/plugins/security-dashboard
 ~/Development/bb-workshop/plugins/skill-highlighting
 ~/Development/bb-workshop/plugins/thinking-signal
 ```
@@ -87,7 +91,7 @@ code themes. Installation preserves whatever appearance is already selected;
 it does not activate either supplied theme. Activation is a separate choice
 with `bb theme set <id>`.
 
-Installation is sequential, not a six-plugin transaction. If a step fails,
+Installation is sequential, not a multi-plugin transaction. If a step fails,
 stop and inspect `bb plugin list`; already moved paths remain usable. Fix the
 failure and rerun. Never remove an ID to retry. After installation, check the
 dashboard, Archived navigation, composer highlighting, and a working row in

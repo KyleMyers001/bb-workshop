@@ -1,0 +1,55 @@
+.security-dashboard { width: 100%; height: 100%; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; padding: 1.5rem 2rem 2rem; color: var(--foreground); font-size: 13px; line-height: 1.55; }
+.security-dashboard * { box-sizing: border-box; }
+.security-dashboard:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.security-dashboard h1 { font-size: 1.4rem; font-weight: 650; letter-spacing: -.035em; }
+.security-dashboard h2 { font-size: 1.15rem; font-weight: 600; letter-spacing: -.02em; margin: .5rem 0; }
+.security-dashboard h3 { font-size: .9rem; font-weight: 600; margin-bottom: .7rem; }
+.security-dashboard p { margin: .65rem 0; overflow-wrap: anywhere; }
+.security-dashboard a, .security-dashboard .security-link { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.security-dashboard button { cursor: pointer; padding: .45rem .75rem; border: 1px solid var(--border); border-radius: .4rem; background: var(--card); color: var(--foreground); font: inherit; font-size: 12px; }
+.security-dashboard button:hover:not(:disabled) { background: var(--accent); }
+.security-dashboard button:disabled { opacity: .6; cursor: default; }
+.security-dashboard button:focus-visible, .security-dashboard input:focus-visible, .security-dashboard select:focus-visible, .security-dashboard textarea:focus-visible, .security-dashboard a:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.security-dashboard input, .security-dashboard select, .security-dashboard textarea { background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: .35rem; padding: .5rem .6rem; font: inherit; max-width: 100%; min-width: 0; }
+.security-dashboard textarea { width: 100%; resize: vertical; font-family: var(--font-mono); font-size: 12px; }
+.security-heading, .security-tabs, .security-filters, .security-summary, .security-actions { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+.security-heading { justify-content: space-between; align-items: flex-start; }
+.security-heading p, .security-muted, .security-footer { color: var(--muted-foreground); font-size: 12px; }
+.security-tabs { padding: .75rem 0 1rem; }
+.security-tabs button[aria-pressed="true"] { border-color: var(--primary); color: var(--primary); background: var(--accent); }
+.security-warning { padding: .65rem .8rem; border-left: 2px solid var(--warning); background: color-mix(in srgb, var(--warning) 6%, var(--background)); font-size: 12px; }
+.security-dashboard .security-link { border: 0; background: transparent; padding: 0; text-align: left; }
+.security-summary { gap: 1.5rem; padding: .6rem 0 1rem; border-bottom: 1px solid var(--border); font-size: 12px; }
+.security-summary b { font-size: 1.3rem; font-weight: 600; margin-right: .25rem; font-variant-numeric: tabular-nums; }
+.security-filters { padding: 1rem 0; font-size: 12px; }
+.security-filters input[type="search"] { flex: 1; min-width: 140px; max-width: 300px; }
+.security-filters label { display: inline-flex; align-items: center; gap: .35rem; }
+.security-filters input[type="checkbox"] { accent-color: var(--primary); }
+.security-table { max-width: 100%; overflow-x: auto; }
+.security-table table { width: 100%; min-width: 590px; border-collapse: collapse; text-align: left; font-size: 12px; }
+.security-table caption { text-align: left; padding-bottom: .5rem; color: var(--muted-foreground); font-size: 11px; }
+.security-table th { font-size: 11px; font-weight: 500; color: var(--muted-foreground); }
+.security-table th, .security-table td { padding: .7rem .65rem; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; max-width: 420px; }
+.security-table th:first-child, .security-table td:first-child { padding-left: 0; }
+.security-table td small { display: block; color: var(--muted-foreground); margin-top: .25rem; }
+.security-badge { display: inline-block; border: 1px solid var(--border); border-radius: .25rem; padding: .1rem .4rem; font-size: 11px; }
+.security-badge.critical, .security-badge.high { color: var(--destructive-text); background: color-mix(in srgb, var(--destructive) 7%, var(--card)); }
+.security-badge.medium, .security-badge.limited, .security-badge.unavailable { color: var(--warning-text); }
+.security-badge.readable { color: var(--success); }
+.security-empty { padding: 1.3rem 0; }
+.security-panel { min-width: 0; padding: 1rem; border: 1px solid var(--border); background: var(--card); border-radius: .65rem; }
+.security-watch { margin: 1rem 0; }
+.security-watch textarea { display: block; margin-top: .5rem; }
+.security-detail-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1rem; margin-top: 1rem; }
+.security-detail-grid dl { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: .65rem; font-size: 12px; margin: 1rem 0; }
+.security-detail-grid dt { color: var(--muted-foreground); }
+.security-detail-grid dd { margin: 0; overflow-wrap: anywhere; }
+.security-dashboard code { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+.security-dashboard .security-primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.security-dashboard .security-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 88%, var(--foreground)); color: var(--primary-foreground); box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 20%, transparent); }
+.security-dashboard .security-primary:active:not(:disabled) { background: color-mix(in srgb, var(--primary) 80%, var(--foreground)); color: var(--primary-foreground); box-shadow: none; }
+.security-field { display: flex; flex-direction: column; gap: .35rem; font-size: 12px; margin: .8rem 0; }
+.security-section-label { padding-top: 1rem; margin-top: 1rem; border-top: 1px solid var(--border); }
+.security-footer { margin-top: 1.1rem; font-size: 11px; }
+@media (max-width: 950px) { .security-detail-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .security-dashboard { padding: 1rem 1rem 1.5rem; } .security-summary { gap: .7rem; } .security-heading { gap: .5rem; } .security-tabs { gap: .4rem; } }
