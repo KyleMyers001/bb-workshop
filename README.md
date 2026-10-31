@@ -9,12 +9,13 @@ source repository, **not** a backup of BB's private configuration or runtime.
 - `plugins/archived-threads`: read-only archived conversation navigation.
 - `plugins/delivery-dashboard`: GitHub activity and contributor comparisons.
 - `plugins/kanban`: project Kanban boards with agent-managed thread cards.
+- `plugins/needs-you`: agent attention inbox with specific asks, snooze, and handled history.
 - `plugins/security-dashboard`: team Dependabot inbox with an explicit repository watch list.
 - `plugins/skill-highlighting`: paint-only slash-skill syntax highlighting.
 - `plugins/thinking-signal`: theme-colored sidebar working indicator.
 - `themes/midnight-observatory` and `themes/tokyo-night-storm`: standalone
   themes, independent of plugins.
-- `.bb/plugins.json`: BB's seven-plugin collection index.
+- `.bb/plugins.json`: BB's eight-plugin collection index.
 
 The original plugin IDs, engine ranges, and SDK **0.6.104** pins are retained.
 There is no shared runtime library. Each plugin owns its manifest and tests;
@@ -38,7 +39,7 @@ npm run verify
 ```
 
 `verify` runs script tests, every plugin's tests, root/plugin typechecks,
-every plugin's SDK-pin check, and all seven builds. Individual aggregates are
+every plugin's SDK-pin check, and all eight builds. Individual aggregates are
 `npm test`, `npm run typecheck`, `npm run sdk:check`, and `npm run build`.
 To work on one package, for example:
 
@@ -72,6 +73,7 @@ verification again **before** reinstalling the same IDs from:
 ~/Development/bb-workshop/plugins/archived-threads
 ~/Development/bb-workshop/plugins/delivery-dashboard
 ~/Development/bb-workshop/plugins/kanban
+~/Development/bb-workshop/plugins/needs-you
 ~/Development/bb-workshop/plugins/security-dashboard
 ~/Development/bb-workshop/plugins/skill-highlighting
 ~/Development/bb-workshop/plugins/thinking-signal
