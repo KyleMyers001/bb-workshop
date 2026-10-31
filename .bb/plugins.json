@@ -7,6 +7,7 @@
     { "name": "archived-threads", "source": "./plugins/archived-threads" },
     { "name": "delivery-dashboard", "source": "./plugins/delivery-dashboard" },
     { "name": "kanban", "source": "./plugins/kanban" },
+    { "name": "security-dashboard", "source": "./plugins/security-dashboard" },
     { "name": "skill-highlighting", "source": "./plugins/skill-highlighting" },
     { "name": "thinking-signal", "source": "./plugins/thinking-signal" }
   ]
