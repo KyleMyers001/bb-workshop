@@ -14,6 +14,7 @@ export function makeCall(
     provider: "pi",
     model: "openai-codex/gpt-6.1-sol",
     reasoningLevel: "high",
+    permissionMode: "full",
     cached: false,
     childThreadId: "thr_runtime",
     providerRetryAttempts: 0,

@@ -8,6 +8,7 @@ import {
 } from "quickjs-emscripten-core";
 import { assertJsonValue } from "./json-value.js";
 import type {
+  DeclaredAgentSelection,
   ExecuteWorkflowScriptArgs,
   JsonValue,
   WorkflowAgentOptions,
@@ -371,6 +372,7 @@ function installAgentFunction(
   enterVm: () => void,
   signal: AbortSignal | undefined,
   currentPhase: () => string | null,
+  declaredSelections: readonly DeclaredAgentSelection[],
 ): { close(reason?: string): void } {
   const bridge = createHostCallBridge(vm, runtime, enterVm, signal);
 
@@ -384,6 +386,21 @@ function installAgentFunction(
     const parsedOptions = parseAgentOptions(
       handles[1] ? dumpJson(vm, handles[1], "agent options") : undefined,
     );
+    const { selection } = parsedOptions;
+    if (
+      selection?.permissionMode !== undefined &&
+      !declaredSelections.some(
+        (declared) =>
+          declared.provider === selection.provider &&
+          declared.model === selection.model &&
+          declared.reasoningLevel === selection.reasoningLevel &&
+          declared.permissionMode === selection.permissionMode,
+      )
+    ) {
+      throw new Error(
+        "agent options.permissionMode must be written inline in an agent() call with its provider, model, and reasoningLevel, so the workflow source shows it",
+      );
+    }
     const options: WorkflowAgentOptions = {
       ...parsedOptions,
       phase: parsedOptions.phase ?? currentPhase(),
@@ -575,6 +592,7 @@ const DSL_SOURCE = `
 export async function executeWorkflowScript({
   args,
   body,
+  declaredSelections = [],
   capabilities,
   limits: limitOverrides,
   signal,
@@ -638,6 +656,7 @@ export async function executeWorkflowScript({
       enterVm,
       signal,
       () => currentPhase,
+      declaredSelections,
     );
     const budgetFunction = vm.newFunction("__bbWorkflowBudget", () =>
       jsonToHandle(vm, scheduler.budget()),

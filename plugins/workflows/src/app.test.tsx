@@ -44,6 +44,7 @@ const run: WorkflowRunView = {
           provider: "codex",
           model: "gpt-5.6",
           reasoningLevel: "medium",
+          permissionMode: "auto",
           cached: false,
           childThreadId: "thr_worker_1",
           providerRetryAttempts: 0,
@@ -68,6 +69,7 @@ const run: WorkflowRunView = {
           provider: "claude",
           model: "claude-opus-4-6",
           reasoningLevel: "high",
+          permissionMode: "full",
           cached: false,
           childThreadId: "thr_worker_2",
           providerRetryAttempts: 0,
@@ -476,7 +478,7 @@ describe("workflow-preview directive", () => {
     expect(slot.getByLabelText("Discover: Completed")).toBeTruthy();
     expect(slot.getByLabelText("Review: Running")).toBeTruthy();
     expect(slot.getByText("Adversarial review")).toBeTruthy();
-    expect(slot.queryByText("claude · opus-4-6 · high")).toBeNull();
+    expect(slot.queryByText("claude · opus-4-6 · high · full")).toBeNull();
     expect(slot.getByText("Inspect implementation")).toBeTruthy();
 
     fireEvent.click(slot.getByRole("button", { name: /Inspect run/i }));
@@ -758,7 +760,7 @@ describe("workflow thread panel", () => {
       slot.getByRole("heading", { name: "Current activity" }),
     ).toBeTruthy();
     const task = slot.getByRole("button", { name: /Adversarial review/ });
-    expect(within(task).getByText("claude · opus-4-6 · high")).toBeTruthy();
+    expect(within(task).getByText("claude · opus-4-6 · high · full")).toBeTruthy();
     expect(
       slot.getByRole("button", { name: "Stop workflow" }).closest("header"),
     ).toBeTruthy();

@@ -532,6 +532,21 @@ export function countCallsForRun(db: Db, runId: string): WorkflowCallCounts {
   return row;
 }
 
+/** How many of a run's calls resolved to each permission mode. */
+export function countCallPermissionModes(
+  db: Db,
+  runId: string,
+): Record<string, number> {
+  const rows = db
+    .prepare(
+      `SELECT resolved_permission_mode AS mode, COUNT(*) AS count
+       FROM workflow_calls WHERE run_id = ?
+       GROUP BY resolved_permission_mode ORDER BY resolved_permission_mode`,
+    )
+    .all(runId) as Array<{ mode: string; count: number }>;
+  return Object.fromEntries(rows.map(({ mode, count }) => [mode, count]));
+}
+
 export function listRunningCalls(db: Db): WorkflowCallRow[] {
   return db
     .prepare(

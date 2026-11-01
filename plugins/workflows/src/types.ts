@@ -7,10 +7,14 @@ export type JsonValue =
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonSchema = boolean | JsonObject;
 
+export type AgentPermissionMode = "accept-edits" | "auto" | "full";
+
 interface ExplicitModelSelection {
   provider: string;
   model: string;
   reasoningLevel: string;
+  /** Absent means the worker inherits the origin thread's permission mode. */
+  permissionMode?: AgentPermissionMode;
 }
 
 export interface WorkflowAgentOptions {
@@ -91,9 +95,19 @@ export interface WorkflowCapabilities {
   phase(title: string): void;
 }
 
+/** A selection written inline in an `agent()` call in the workflow's source. */
+export interface DeclaredAgentSelection {
+  provider: string;
+  model: string;
+  reasoningLevel: string;
+  permissionMode: string | null;
+}
+
 export interface ExecuteWorkflowScriptArgs {
   args: JsonValue;
   body: string;
+  /** Without an inline match here, a call cannot set a permission mode. */
+  declaredSelections?: readonly DeclaredAgentSelection[];
   capabilities: WorkflowCapabilities;
   limits?: Partial<WorkflowRuntimeLimits>;
   signal?: AbortSignal;
