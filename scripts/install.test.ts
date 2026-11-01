@@ -5,17 +5,17 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { install, parseMode, type Runner } from "./install.ts";
 
-function fixture() {
+function fixture(id = "example") {
   const root = mkdtempSync(join(tmpdir(), "bb-workshop-install-test-"));
   const themeDir = join(root, "installed-themes");
   for (const dir of [".bb", "plugins/example", "themes/example"]) {
     mkdirSync(join(root, dir), { recursive: true });
   }
   writeFileSync(join(root, ".bb/plugins.json"), JSON.stringify({
-    plugins: [{ name: "example", source: "./plugins/example" }],
+    plugins: [{ name: id, source: "./plugins/example" }],
   }));
   writeFileSync(join(root, "plugins/example/package.json"), JSON.stringify({
-    name: "bb-plugin-example",
+    name: `bb-plugin-${id}`,
   }));
   writeFileSync(join(root, "themes/example/theme.css"), ":root { --ink: red; }");
   const calls: string[] = [];
@@ -25,6 +25,7 @@ function fixture() {
   let failedActivation = false;
   let managed = false;
   let enabled = true;
+  let builtinEnabled: boolean | undefined;
   const run: Runner = (file, args, cwd) => {
     assert.equal(cwd, root);
     const command = [file, ...args].join(" ");
@@ -32,11 +33,14 @@ function fixture() {
     if (command === "bb theme dir --json") return JSON.stringify({ dir: themeDir });
     if (command === "bb theme show --json") return JSON.stringify({ themeId: "unchanged" });
     if (command === "bb plugin list --json") return JSON.stringify({ plugins: [{
-      id: "example", source: managed ? "git:example.invalid/plugin" : "path:/permanent/original", enabled,
+      id, source: managed ? "git:example.invalid/plugin" : "path:/permanent/original", enabled,
       rootDir: moved ? join(root, "plugins/example") : "/permanent/original",
       status: moved && failedActivation ? "failed" : "running",
-    }] });
-    if (command === "bb plugin config example --json") return JSON.stringify({
+    }, ...(builtinEnabled === undefined ? [] : [{
+      id: "workflows", source: "builtin:workflows", enabled: builtinEnabled,
+      rootDir: "/bundled/workflows", status: builtinEnabled ? "running" : "disabled",
+    }])] });
+    if (command === `bb plugin config ${id} --json`) return JSON.stringify({
       values: { greeting: moved && configChanges ? "changed" : "preserved" },
     });
     if (command === "npm run verify") {
@@ -55,6 +59,7 @@ function fixture() {
     failActivation() { failedActivation = true; },
     makeManaged() { managed = true; },
     disable() { enabled = false; },
+    withBuiltinWorkflows(enabled: boolean) { builtinEnabled = enabled; },
   };
 }
 
@@ -125,6 +130,22 @@ test("refuses managed and disabled replacements before verification or installat
     assert.throws(() => install(f.root, false, f.run), /managed or disabled/);
     assert.ok(!f.calls.some(c => c === "npm run verify" || c.startsWith("bb plugin install")));
   }
+});
+
+test("workshop workflows refuses an enabled builtin before any installation", () => {
+  const f = fixture("workshop-workflows");
+  f.withBuiltinWorkflows(true);
+  assert.throws(() => install(f.root, false, f.run), /Disable builtin Workflows/);
+  assert.ok(!f.calls.some(c => c === "npm run verify" || c.startsWith("bb plugin install")));
+  assert.ok(!f.calls.some(c => /plugin (disable|remove)|config .* set/.test(c)));
+});
+
+test("workshop workflows can install with the builtin disabled and untouched", () => {
+  const f = fixture("workshop-workflows");
+  f.withBuiltinWorkflows(false);
+  install(f.root, false, f.run);
+  assert.ok(f.calls.some(c => c.startsWith("bb plugin install")));
+  assert.ok(!f.calls.some(c => /plugin (disable|enable|remove)|config workflows/.test(c)));
 });
 
 test("rejects escaped collection paths and package identity mismatches", () => {

@@ -93,6 +93,13 @@ export function install(root: string, dryRun: boolean, run: Runner = command): v
   if (dryRun) return;
 
   const before: InstalledPlugin[] = json("plugin", "list").plugins;
+  if (plugins.some(p => p.id === "workshop-workflows") &&
+      before.some(p => p.id === "workflows" && p.enabled)) {
+    throw new Error(
+      "Disable builtin Workflows after checking for active runs before installing workshop-workflows; " +
+      "see plugins/workflows/README.md. The installer does not change its state or copy its history.",
+    );
+  }
   for (const plugin of plugins) {
     const existing = before.find(p => p.id === plugin.id);
     if (existing && (!existing.source.startsWith("path:") || !existing.enabled)) {

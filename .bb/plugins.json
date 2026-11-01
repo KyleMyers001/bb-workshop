@@ -11,6 +11,7 @@
     { "name": "security-dashboard", "source": "./plugins/security-dashboard" },
     { "name": "skill-highlighting", "source": "./plugins/skill-highlighting" },
     { "name": "thinking-signal", "source": "./plugins/thinking-signal" },
-    { "name": "workbench-reader", "source": "./plugins/workbench-reader" }
+    { "name": "workbench-reader", "source": "./plugins/workbench-reader" },
+    { "name": "workshop-workflows", "source": "./plugins/workflows" }
   ]
 }

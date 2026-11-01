@@ -15,13 +15,17 @@ source repository, **not** a backup of BB's private configuration or runtime.
 - `plugins/thinking-signal`: theme-colored sidebar working indicator.
 - `plugins/workbench-reader`: read-only Markdown library, local full-text search,
   and focused reading for Workbench documents.
+- `plugins/workflows`: independently maintained Workflows copy with plugin ID
+  `workshop-workflows`, familiar commands/tools, and vendored public-SDK UI.
 - `themes/midnight-observatory` and `themes/tokyo-night-storm`: standalone
   themes, independent of plugins.
 - `themes/midnight-studio`: opt-in Observatory variant with conversation-only
   reading typography; the native composer and its fades stay unchanged.
-- `.bb/plugins.json`: BB's nine-plugin collection index.
+- `.bb/plugins.json`: BB's ten-plugin collection index.
 
-The original plugin IDs, engine ranges, and SDK **0.6.104** pins are retained.
+The original plugin IDs, engine ranges, and SDK **0.6.104** pins are retained,
+except the Workflows fork uses `workshop-workflows` because BB reserves the
+builtin `workflows` ID.
 There is no shared runtime library. Each plugin owns its manifest and tests;
 all npm dependencies resolve through one root lockfile.
 
@@ -43,7 +47,7 @@ npm run verify
 ```
 
 `verify` runs script tests, every plugin's tests, root/plugin typechecks,
-every plugin's SDK-pin check, and all nine builds. Individual aggregates are
+every plugin's SDK-pin check, and all ten builds. Individual aggregates are
 `npm test`, `npm run typecheck`, `npm run sdk:check`, and `npm run build`.
 To work on one package, for example:
 
@@ -82,10 +86,17 @@ verification again **before** reinstalling the same IDs from:
 ~/Development/bb-workshop/plugins/skill-highlighting
 ~/Development/bb-workshop/plugins/thinking-signal
 ~/Development/bb-workshop/plugins/workbench-reader
+~/Development/bb-workshop/plugins/workflows
 ```
 
 The script never calls `plugin remove`, writes plugin settings, selects a
-theme, or changes code themes. Existing path-plugin settings are compared
+theme, or changes code themes. Initial Workflows cutover is a separate explicit
+step: verify first, check that no builtin workflows are active across projects,
+then disable (never remove) builtin `workflows`, install `workshop-workflows`,
+and explicitly copy its six public settings. Builtin history is not migrated.
+Only one copy may be enabled. The installer refuses to apply while the builtin
+is enabled; see [Workflows cutover and rollback](plugins/workflows/README.md).
+Existing path-plugin settings are compared
 before/after without printing their values; managed or disabled replacements
 are refused. Theme files are copied to `bb theme dir`, identical files are
 left alone, and differing files or symlinks cause a preflight failure—no
@@ -100,8 +111,9 @@ with `bb theme set <id>`.
 Installation is sequential, not a multi-plugin transaction. If a step fails,
 stop and inspect `bb plugin list`; already moved paths remain usable. Fix the
 failure and rerun. Never remove an ID to retry. After installation, check the
-dashboard, Archived navigation, composer highlighting, and a working row in
-an open BB window; reload that window if needed.
+dashboard, Archived navigation, composer highlighting, a working row, and a
+new Workflows run card/inspector in an open BB window; reload that window if
+needed.
 
 ## Updates
 
