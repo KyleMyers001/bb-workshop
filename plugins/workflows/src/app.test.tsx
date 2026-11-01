@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { WorkflowRunView } from "./ui-contract.js";
@@ -119,7 +125,11 @@ describe("workflow composer banner", () => {
     expect(slot.getByText("Review the release")).toBeTruthy();
     expect(slot.getByText("Queue release notes")).toBeTruthy();
     expect(slot.getByText("Review")).toBeTruthy();
-    expect(slot.getByText("1/2 agents")).toBeTruthy();
+    expect(slot.getByText("1 running")).toBeTruthy();
+    expect(
+      slot.getAllByRole("list", { name: "Phase progression" }),
+    ).toHaveLength(1);
+    expect(slot.getByLabelText("Review: Running")).toBeTruthy();
     expect(slot.getAllByRole("region", { name: "Workflow" })).toHaveLength(2);
     expect(
       slot.getByRole("button", {
@@ -246,7 +256,7 @@ describe("workflow composer banner", () => {
     expect(body?.getAttribute("aria-hidden")).toBe("false");
     expect(body?.className).toContain("grid-rows-[1fr]");
     expect(slot.getByText("Adversarial review")).toBeTruthy();
-    expect(slot.getByRole("button", { name: /Review0\/1/ })).toBeTruthy();
+    expect(slot.queryByText(/opus-4-6/)).toBeNull();
     const collapse = slot.getByRole("button", {
       name: "Collapse workflow Review the release",
     });
@@ -387,6 +397,42 @@ describe("workflow composer banner", () => {
 });
 
 describe("workflow-preview directive", () => {
+  it("keeps the expanded card informative, with named phases and metadata-free task rows", async () => {
+    const openTab = vi.fn(() => true);
+    const slot = renderSlot(
+      app.messageDirectives[0]!,
+      {
+        attributes: { run: run.id },
+        source: `::workflow-preview{run="${run.id}"}`,
+        message,
+        openWorkspaceFile: null,
+      },
+      {
+        experimental_panel: { openTab },
+        rpc: { workflowRunView: () => ({ run }) },
+      },
+    );
+
+    expect(await slot.findByRole("heading", { name: run.name })).toBeTruthy();
+    expect(
+      within(slot.container.querySelector("header")!).getByText("Running"),
+    ).toBeTruthy();
+    expect(slot.getByText("1 agent running")).toBeTruthy();
+    const phases = slot.getByRole("list", { name: "Phase progression" });
+    expect(within(phases).getByLabelText("Discover: Completed")).toBeTruthy();
+    expect(within(phases).getByLabelText("Review: Running")).toBeTruthy();
+    expect(slot.getByText("Inspect implementation")).toBeTruthy();
+    expect(slot.getByText("Adversarial review")).toBeTruthy();
+    expect(slot.queryByText(/opus-4-6/)).toBeNull();
+    expect(slot.getByText("1 completed · 1 running")).toBeTruthy();
+    fireEvent.click(slot.getByRole("button", { name: /Inspect run/ }));
+    expect(openTab).toHaveBeenCalledWith(
+      expect.objectContaining({ params: { runId: run.id } }),
+    );
+    expect(slot.getByText("Adversarial review")).toBeTruthy();
+    expect(slot.getByRole("list", { name: "Phase progression" })).toBeTruthy();
+  });
+
   it("rejects untrusted attributes before making an RPC call", async () => {
     const slot = renderSlot(
       app.messageDirectives[0]!,
@@ -426,41 +472,14 @@ describe("workflow-preview directive", () => {
       },
     );
 
-    await slot.findByText("Review the release");
-    expect(slot.getByText("Discover")).toBeTruthy();
-    expect(slot.getAllByText("Review")).toHaveLength(1);
+    await slot.findByRole("heading", { name: "Review the release" });
+    expect(slot.getByLabelText("Discover: Completed")).toBeTruthy();
+    expect(slot.getByLabelText("Review: Running")).toBeTruthy();
     expect(slot.getByText("Adversarial review")).toBeTruthy();
-    expect(slot.getByText("claude · opus-4-6 · high")).toBeTruthy();
-    expect(slot.queryByText("Running")).toBeNull();
-    expect(
-      slot.getByText("Review the release").className.includes("animate-shine"),
-    ).toBe(true);
-    expect(
-      slot.getByText("Adversarial review").className.includes("animate-shine"),
-    ).toBe(false);
-    expect(
-      slot.getAllByText("Review")[0]!.className.includes("animate-shine"),
-    ).toBe(false);
+    expect(slot.queryByText("claude · opus-4-6 · high")).toBeNull();
+    expect(slot.getByText("Inspect implementation")).toBeTruthy();
 
-    const workflowToggle = slot.getByRole("button", {
-      name: "Workflow: Review the release",
-    });
-    fireEvent.click(workflowToggle);
-    expect(workflowToggle.getAttribute("aria-expanded")).toBe("false");
-    const collapsedRegion = document.getElementById(
-      workflowToggle.getAttribute("aria-controls")!,
-    );
-    expect(collapsedRegion?.getAttribute("role")).toBe("region");
-    expect(collapsedRegion?.getAttribute("aria-labelledby")).toBe(
-      workflowToggle.id,
-    );
-    expect(collapsedRegion?.hasAttribute("inert")).toBe(true);
-    expect(
-      collapsedRegion?.querySelector('button[aria-expanded="true"]'),
-    ).toBeTruthy();
-    fireEvent.click(workflowToggle);
-
-    fireEvent.click(slot.getByRole("button", { name: /open in right panel/i }));
+    fireEvent.click(slot.getByRole("button", { name: /Inspect run/i }));
     expect(openTab).toHaveBeenCalledWith({
       tab: {
         id: "workflow-run",
@@ -500,9 +519,10 @@ describe("workflow-preview directive", () => {
       threadId: "thr_worker_2",
     });
 
-    fireEvent.click(slot.getByRole("button", { name: /Discover1\/1/ }));
-    const inertWorker = slot.getByText("Inspect implementation").parentElement;
-    expect(inertWorker?.tagName).toBe("DIV");
+    const inertWorker = slot
+      .getByText("Inspect implementation")
+      .closest("button");
+    expect(inertWorker).toBeNull();
   });
 
   it("keeps workers outside declared phases visible", async () => {
@@ -539,7 +559,7 @@ describe("workflow-preview directive", () => {
       { rpc: { workflowRunView: () => ({ run: unphasedRun }) } },
     );
 
-    await slot.findByText("Other work");
+    await slot.findByLabelText("Other work: Running");
     expect(slot.getByText("Unphased verification")).toBeTruthy();
   });
 
@@ -584,7 +604,7 @@ describe("workflow-preview directive", () => {
 
     await slot.experimental_invalidateRpc(["runs:thr_origin"]);
     expect(await slot.findByText("Review the release")).toBeTruthy();
-    expect(slot.queryByText("Complete")).toBeNull();
+    expect(slot.queryByLabelText("Review: Completed")).toBeNull();
 
     await slot.experimental_invalidateRpc(["runs:thr_origin"]);
     expect((await slot.findByRole("status")).textContent).toBe(
@@ -593,7 +613,7 @@ describe("workflow-preview directive", () => {
     expect(slot.getByText("Review the release")).toBeTruthy();
 
     await slot.experimental_invalidateRpc(["runs:thr_origin"]);
-    expect(await slot.findByText("Complete")).toBeTruthy();
+    expect(await slot.findByLabelText("Review: Completed")).toBeTruthy();
     expect(slot.queryByRole("status")).toBeNull();
     expect(attempt).toBe(4);
   });
@@ -665,7 +685,7 @@ describe("workflow-preview directive", () => {
     expect(slot.rpcCalls).toHaveLength(2);
   });
 
-  it("renders successful empty phases as settled", async () => {
+  it("renders empty terminal phases without inventing completed calls", async () => {
     const succeededRun: WorkflowRunView = {
       ...run,
       status: "succeeded",
@@ -684,18 +704,10 @@ describe("workflow-preview directive", () => {
       { rpc: { workflowRunView: () => ({ run: succeededRun }) } },
     );
 
-    await slot.findByText("Complete");
-    expect(
-      slot
-        .getAllByText("Empty phase")
-        .some((element) => element.className.includes("line-through")),
-    ).toBe(false);
-    expect(
-      slot
-        .getAllByText("Empty phase")
-        .some((element) => element.className.includes("no-underline")),
-    ).toBe(true);
-    expect(slot.getByText("not started")).toBeTruthy();
+    await slot.findByRole("heading", { name: run.name });
+    expect(slot.getByLabelText("Empty phase: Waiting")).toBeTruthy();
+    expect(slot.getAllByText("No agent calls started")).toHaveLength(2);
+    expect(slot.container.querySelector('[data-icon="Spinner"]')).toBeNull();
   });
 
   it("uses cancelled presentation for the run, phase, and call", async () => {
@@ -721,15 +733,42 @@ describe("workflow-preview directive", () => {
       { rpc: { workflowRunView: () => ({ run: cancelledRun }) } },
     );
 
-    await slot.findByText("Cancelled");
-    expect(slot.container.querySelectorAll('[data-icon="Pause"]')).toHaveLength(
-      2,
-    );
-    expect(slot.container.querySelector('[data-icon="Check"]')).toBeNull();
+    await slot.findByRole("heading", { name: run.name });
+    expect(slot.getByLabelText("Review: Stopped")).toBeTruthy();
+    expect(slot.getAllByText("1 stopped")).toHaveLength(2);
+    expect(
+      slot.container.querySelectorAll('[data-icon="Square"]'),
+    ).toHaveLength(2);
+    expect(
+      slot.container.querySelector('[data-icon="CircleCheck"]'),
+    ).toBeNull();
   });
 });
 
 describe("workflow thread panel", () => {
+  it("leads with activity, keeps metadata secondary, and collapses technical run details", async () => {
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_origin", environment: null, params: { runId: run.id } },
+      { rpc: { workflowRunView: () => ({ run }) } },
+    );
+    await slot.findByRole("heading", { name: run.name });
+    expect(slot.getByText("1 agent running")).toBeTruthy();
+    expect(
+      slot.getByRole("heading", { name: "Current activity" }),
+    ).toBeTruthy();
+    const task = slot.getByRole("button", { name: /Adversarial review/ });
+    expect(within(task).getByText("claude · opus-4-6 · high")).toBeTruthy();
+    expect(
+      slot.getByRole("button", { name: "Stop workflow" }).closest("header"),
+    ).toBeTruthy();
+    const details = slot.getByText("Run details").closest("details");
+    expect(details?.open).toBe(false);
+    fireEvent.click(slot.getByText("Run details"));
+    expect(details?.open).toBe(true);
+    expect(within(details!).getByText(run.id)).toBeTruthy();
+  });
+
   it("opens worker threads and stops an active run through typed RPC", async () => {
     let stopped = false;
     const slot = renderSlot(
@@ -756,11 +795,15 @@ describe("workflow thread panel", () => {
     const scrollArea = slot.container.querySelector(
       '[data-detail-scroll-area="workflow-panel"]',
     );
-    expect(scrollArea?.className).toContain("p-4");
-    expect(scrollArea?.parentElement?.className).toContain("bg-border");
-    expect(slot.queryByText("Inspect implementation")).toBeNull();
+    expect(scrollArea?.className).toContain("p-6");
+    expect(scrollArea?.parentElement?.className).toContain("bg-background");
+    expect(
+      slot.queryByRole("button", { name: /Inspect implementation/ }),
+    ).toBeNull();
     expect(slot.getByText("Adversarial review")).toBeTruthy();
-    fireEvent.click(slot.getByRole("button", { name: /Discover1\/1/ }));
+    fireEvent.click(
+      slot.getByRole("button", { name: /Discover.*1 completed/ }),
+    );
     expect(slot.getByText("Inspect implementation")).toBeTruthy();
     fireEvent.click(slot.getByRole("button", { name: /adversarial review/i }));
     expect(slot.navigateCalls).toContainEqual({
@@ -773,7 +816,8 @@ describe("workflow thread panel", () => {
       expect(
         slot.rpcCalls.some((call) => call.method === "workflowStopRun"),
       ).toBe(true);
-      expect(slot.getByText("Cancelled")).toBeTruthy();
+      expect(slot.getAllByText("Stopped").length).toBeGreaterThan(0);
+      expect(slot.queryByRole("button", { name: "Stop workflow" })).toBeNull();
     });
   });
 

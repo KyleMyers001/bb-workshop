@@ -1,12 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  activityIconClass,
-  activityMetaClass,
-  activityRowClass,
-  activityTextClass,
-  type ActivityRowState,
-} from "./activity-row-styles";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "./icon";
+import { WORKFLOW_FOCUS_CLASS } from "./chrome-style-tokens";
 import { cn } from "../../lib/utils";
 
 export type WorkflowProgressAgentState =
@@ -28,17 +22,16 @@ export interface WorkflowProgressAgent {
   cached: boolean;
   lastProgressAt: number;
   phaseIndex?: number;
-  agentType?: string;
   error?: string;
-  tokens?: number;
-  toolCalls?: number;
   durationMs?: number;
+  startedAt?: number;
   metadata?: readonly string[];
 }
 
 export interface WorkflowProgressPhase {
   index: number;
   title: string;
+  detail?: string | null;
 }
 
 export interface WorkflowProgressSnapshot {
@@ -46,257 +39,216 @@ export interface WorkflowProgressSnapshot {
   agents: readonly WorkflowProgressAgent[];
 }
 
-type WorkflowAgentDisplayState = WorkflowProgressAgentState | "interrupted";
-
-interface WorkflowPhaseGroup {
+type DisplayState =
+  | "running"
+  | "done"
+  | "failed"
+  | "stopped"
+  | "waiting"
+  | "active";
+interface PhaseGroup {
+  phase: WorkflowProgressPhase;
   agents: WorkflowProgressAgent[];
-  phase: WorkflowProgressPhase | null;
 }
 
-const ACTIVE_PHASE_SCROLL_OFFSET = 12;
-const PROMPT_STACK_ACTIVE_ROW_CLASS = "shadow-none ring-0";
-const PROMPT_STACK_ACTIVE_ICON_CLASS = "text-foreground";
-const PROMPT_STACK_ACTIVE_TEXT_CLASS = "font-medium text-foreground";
-
-function isSettledAgentState(state: WorkflowProgressAgentState): boolean {
-  return (
-    state === "done" ||
-    state === "failed" ||
-    state === "skipped" ||
-    state === "cancelled"
-  );
-}
-
-function deriveAgentDisplayState(
-  agent: WorkflowProgressAgent,
-  workflowSettled: boolean,
-): WorkflowAgentDisplayState {
-  if (workflowSettled && !isSettledAgentState(agent.state)) {
-    return "interrupted";
-  }
-  return agent.state;
-}
-
-const AGENT_STATE_ICON: Record<
-  WorkflowAgentDisplayState,
-  { name: IconName; className: string }
+const STATE: Record<
+  DisplayState,
+  { label: string; icon: IconName; tone: string }
 > = {
-  done: { name: "Check", className: "text-muted-foreground/60" },
-  failed: { name: "X", className: "text-destructive/80" },
-  skipped: { name: "X", className: "text-muted-foreground/45" },
-  cancelled: { name: "Pause", className: "text-muted-foreground/45" },
-  running: { name: "Spinner", className: "animate-spin text-foreground" },
-  queued: { name: "Circle", className: "text-muted-foreground/45" },
-  interrupted: { name: "Circle", className: "text-muted-foreground/45" },
+  running: { label: "Running", icon: "Spinner", tone: "text-primary" },
+  active: { label: "Active", icon: "Circle", tone: "text-primary" },
+  done: { label: "Completed", icon: "CircleCheck", tone: "text-success" },
+  failed: {
+    label: "Failed",
+    icon: "AlertCircle",
+    tone: "text-destructive-text",
+  },
+  stopped: { label: "Stopped", icon: "Square", tone: "text-muted-foreground" },
+  waiting: { label: "Waiting", icon: "Circle", tone: "text-subtle-foreground" },
 };
 
-function WorkflowAgentStateIcon({
+function StateIcon({
   state,
-  className: overrideClassName,
+  className,
 }: {
-  state: WorkflowAgentDisplayState;
+  state: DisplayState;
   className?: string;
 }) {
-  const entry = AGENT_STATE_ICON[state];
   return (
     <Icon
-      name={entry.name}
-      className={cn("size-3.5 shrink-0", entry.className, overrideClassName)}
+      name={STATE[state].icon}
+      className={cn(
+        "size-3.5 shrink-0",
+        STATE[state].tone,
+        state === "running" && "motion-safe:animate-spin",
+        className,
+      )}
       aria-hidden="true"
     />
   );
 }
 
-function formatCompactTokens(tokens: number): string {
-  if (tokens >= 1_000_000) {
-    return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")}m`;
-  }
-  if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
-  }
-  return `${tokens}`;
-}
-
-function formatCompactDuration(durationMs: number): string {
-  const totalSeconds = Math.max(0, Math.round(durationMs / 1_000));
-  if (totalSeconds < 60) return `${totalSeconds}s`;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}m${seconds.toString().padStart(2, "0")}s`;
-}
-
-function shortModelName(model: string): string {
-  const match = /^claude-([a-z]+)/.exec(model);
-  return match?.[1] ?? model;
-}
-
-interface WorkflowAgentStats {
-  meta: string;
-  duration: string | null;
-}
-
-function buildAgentStats(
+function agentState(
   agent: WorkflowProgressAgent,
-  displayState: WorkflowAgentDisplayState,
-): WorkflowAgentStats {
-  const parts =
-    agent.metadata === undefined
-      ? [agent.agentType, shortModelName(agent.model)].filter(
-          (part): part is string => part !== undefined,
-        )
-      : [...agent.metadata];
-  if (agent.tokens !== undefined && agent.tokens > 0) {
-    parts.push(`${formatCompactTokens(agent.tokens)} tok`);
+  settled: boolean,
+): DisplayState {
+  switch (agent.state) {
+    case "done":
+    case "skipped":
+      return "done";
+    case "failed":
+      return "failed";
+    case "cancelled":
+      return "stopped";
+    case "running":
+      return settled ? "stopped" : "running";
+    case "queued":
+      return settled ? "stopped" : "waiting";
   }
-  if (agent.toolCalls !== undefined && agent.toolCalls > 0) {
-    parts.push(
-      `${agent.toolCalls} ${agent.toolCalls === 1 ? "tool" : "tools"}`,
-    );
-  }
-  if (agent.attempt > 1) parts.push(`attempt ${agent.attempt}`);
-  if (agent.cached) parts.push("cached");
-  if (displayState === "queued") parts.push("queued");
-  if (displayState === "interrupted") parts.push("stopped");
-  if (displayState === "cancelled") parts.push("cancelled");
+}
+
+export function workflowCounts(
+  agents: readonly WorkflowProgressAgent[],
+  settled = false,
+) {
   return {
-    meta: parts.join(" · "),
-    duration:
-      agent.durationMs === undefined
-        ? null
-        : formatCompactDuration(agent.durationMs),
+    completed: agents.filter((agent) => agent.state === "done").length,
+    running: agents.filter((agent) => agentState(agent, settled) === "running")
+      .length,
+    failed: agents.filter((agent) => agent.state === "failed").length,
+    stopped: agents.filter((agent) => agentState(agent, settled) === "stopped")
+      .length,
+    waiting: agents.filter((agent) => agentState(agent, settled) === "waiting")
+      .length,
   };
 }
 
-function activityStateForAgent(
-  displayState: WorkflowAgentDisplayState,
-): ActivityRowState {
-  switch (displayState) {
-    case "running":
-      return "active";
-    case "done":
-    case "skipped":
-      return "completed";
-    case "cancelled":
-      return "muted";
-    case "failed":
-      return "failed";
-    case "queued":
-      return "pending";
-    case "interrupted":
-      return "muted";
-  }
+export function workflowCountLabel(
+  agents: readonly WorkflowProgressAgent[],
+  settled = false,
+): string {
+  const counts = workflowCounts(agents, settled);
+  const parts = [
+    counts.completed > 0 ? `${counts.completed} completed` : null,
+    counts.running > 0 ? `${counts.running} running` : null,
+    counts.failed > 0 ? `${counts.failed} failed` : null,
+    counts.stopped > 0 ? `${counts.stopped} stopped` : null,
+    counts.waiting > 0 ? `${counts.waiting} queued` : null,
+  ].filter(Boolean);
+  return parts.length === 0 ? "No agent calls started" : parts.join(" · ");
 }
 
-function promptStackActivityRowClass(
-  state: ActivityRowState,
-  className?: string,
-): string {
-  return activityRowClass(
-    state,
-    cn(state === "active" && PROMPT_STACK_ACTIVE_ROW_CLASS, className),
+function phaseGroups(progress: WorkflowProgressSnapshot): PhaseGroup[] {
+  const groups = progress.phases.map((phase) => ({
+    phase,
+    agents: progress.agents.filter((agent) => agent.phaseIndex === phase.index),
+  }));
+  const unphased = progress.agents.filter(
+    (agent) =>
+      !progress.phases.some((phase) => phase.index === agent.phaseIndex),
   );
-}
-
-function promptStackActivityIconClass(
-  state: ActivityRowState,
-  className?: string,
-): string {
-  if (state === "active") {
-    return cn(PROMPT_STACK_ACTIVE_ICON_CLASS, className);
+  if (unphased.length > 0) {
+    groups.push({
+      phase: { index: -1, title: "Other work" },
+      agents: unphased,
+    });
   }
-  return activityIconClass(state, className);
+  return groups;
 }
 
-function promptStackActivityTextClass(
-  state: ActivityRowState,
-  className?: string,
-): string {
-  if (state === "active") {
-    return cn(PROMPT_STACK_ACTIVE_TEXT_CLASS, className);
-  }
-  return activityTextClass(state, className);
+function phaseState(
+  group: PhaseGroup,
+  settled: boolean,
+  currentPhaseIndex?: number,
+): DisplayState {
+  const states = group.agents.map((agent) => agentState(agent, settled));
+  // Independent lanes may overlap phases. Actual running work takes precedence
+  // over the last phase() marker and remains visible in every active group.
+  if (states.includes("running")) return "running";
+  if (states.includes("failed")) return "failed";
+  if (states.includes("stopped")) return "stopped";
+  if (states.length > 0 && states.every((state) => state === "done"))
+    return "done";
+  if (!settled && group.phase.index === currentPhaseIndex) return "active";
+  return "waiting";
 }
 
-function WorkflowAgentLine({
+function formatDuration(durationMs: number): string {
+  const seconds = Math.max(0, Math.round(durationMs / 1_000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m${seconds % 60 === 0 ? "" : ` ${seconds % 60}s`}`;
+}
+
+function AgentLine({
   agent,
+  compact,
+  settled,
+  now,
   onActivate,
-  promptStack = false,
-  workflowSettled,
 }: {
   agent: WorkflowProgressAgent;
+  compact: boolean;
+  settled: boolean;
+  now: number;
   onActivate?: () => void;
-  promptStack?: boolean;
-  workflowSettled: boolean;
 }) {
-  const displayState = deriveAgentDisplayState(agent, workflowSettled);
-  const activityState = activityStateForAgent(displayState);
-  const stats = buildAgentStats(agent, displayState);
+  const state = agentState(agent, settled);
+  const metadata = [
+    ...(agent.metadata ?? [agent.model]),
+    agent.attempt > 1 ? `attempt ${agent.attempt}` : null,
+    agent.cached ? "cached" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const duration =
+    agent.durationMs ??
+    (state === "running" && agent.startedAt !== undefined
+      ? Math.max(0, now - agent.startedAt)
+      : undefined);
   const content = (
     <>
-      <WorkflowAgentStateIcon
-        state={displayState}
-        className={
-          promptStack
-            ? displayState === "running"
-              ? undefined
-              : promptStackActivityIconClass(activityState)
-            : undefined
-        }
-      />
-      <span
-        className={
-          promptStack
-            ? promptStackActivityTextClass(
-                activityState,
-                "min-w-0 truncate text-xs no-underline",
-              )
-            : cn(
-                "min-w-0 truncate text-xs",
-                displayState === "running"
-                  ? "text-foreground"
-                  : "text-muted-foreground",
-              )
-        }
-        title={agent.label}
-      >
-        {agent.label}
-      </span>
-      {displayState === "failed" && agent.error ? (
-        <span className="min-w-0 truncate text-xs text-destructive/80">
-          — {agent.error}
+      <StateIcon state={state} className="mt-0.5" />
+      <span className="min-w-0">
+        <span className="block break-words text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]">
+          {agent.label}
         </span>
-      ) : null}
-      <span className="ml-auto flex shrink-0 items-baseline gap-2">
-        {stats.meta === "" ? null : (
-          <span
-            className="whitespace-nowrap font-mono text-2xs text-subtle-foreground/80"
-            title={stats.meta}
-          >
-            {stats.meta}
+        {compact ? null : (
+          <span className="mt-0.5 block break-words text-2xs leading-relaxed text-subtle-foreground [overflow-wrap:anywhere]">
+            {metadata}
           </span>
         )}
-        {stats.duration === null ? null : (
-          <span className="min-w-9 whitespace-nowrap text-right text-xs tabular-nums text-subtle-foreground">
-            {stats.duration}
+        {agent.error ? (
+          <span className="mt-1 block break-words text-xs text-destructive-text [overflow-wrap:anywhere]">
+            {agent.error}
+          </span>
+        ) : null}
+      </span>
+      <span className="text-right text-2xs leading-relaxed text-subtle-foreground">
+        <span className={cn("block", state === "failed" && STATE.failed.tone)}>
+          {agent.state === "skipped" ? "Skipped" : STATE[state].label}
+        </span>
+        {compact || duration === undefined ? null : (
+          <span className="mt-0.5 block whitespace-nowrap tabular-nums">
+            {formatDuration(duration)}
           </span>
         )}
       </span>
     </>
   );
-  const className = promptStack
-    ? promptStackActivityRowClass(
-        activityState,
-        cn(
-          "flex min-h-7 w-full min-w-0 items-center gap-2 text-left text-xs",
-          onActivate && "cursor-pointer hover:bg-state-hover",
-        ),
-      )
-    : cn(
-        "flex min-w-0 items-center gap-2 px-2 py-0.5 text-left",
-        onActivate && "w-full cursor-pointer rounded hover:bg-state-hover",
-      );
+  const className = cn(
+    "grid w-full min-w-0 grid-cols-[14px_minmax(0,1fr)_auto] items-start gap-2 text-left",
+    compact ? "py-1" : "rounded-md px-2 py-2.5",
+    onActivate && "cursor-pointer hover:bg-state-hover",
+    WORKFLOW_FOCUS_CLASS,
+  );
   return onActivate ? (
-    <button type="button" className={className} onClick={onActivate}>
+    <button
+      type="button"
+      className={className}
+      onClick={onActivate}
+      title="Open agent thread"
+    >
       {content}
     </button>
   ) : (
@@ -304,392 +256,148 @@ function WorkflowAgentLine({
   );
 }
 
-function groupAgentsByPhase(
-  phases: readonly WorkflowProgressPhase[],
-  agents: readonly WorkflowProgressAgent[],
-): WorkflowPhaseGroup[] {
-  const groups: WorkflowPhaseGroup[] = [];
-  const byIndex = new Map<number, WorkflowPhaseGroup>();
-  for (const phase of phases) {
-    const group: WorkflowPhaseGroup = { phase, agents: [] };
-    groups.push(group);
-    byIndex.set(phase.index, group);
-  }
-  const unphased: WorkflowProgressAgent[] = [];
-  for (const agent of agents) {
-    const group =
-      agent.phaseIndex !== undefined ? byIndex.get(agent.phaseIndex) : null;
-    if (group) group.agents.push(agent);
-    else unphased.push(agent);
-  }
-  if (unphased.length > 0) groups.push({ phase: null, agents: unphased });
-  return groups;
-}
-
-function phaseProgressLabel(agents: readonly WorkflowProgressAgent[]): string {
-  if (agents.length === 0) return "not started";
-  const settled = agents.filter((agent) =>
-    isSettledAgentState(agent.state),
-  ).length;
-  return `${settled}/${agents.length}`;
-}
-
-function groupKey(group: WorkflowPhaseGroup): string {
-  return group.phase ? `phase-${group.phase.index}` : "unphased";
-}
-
-function activePhaseKey(
-  groups: readonly WorkflowPhaseGroup[],
-  currentPhaseIndex?: number,
-): string | null {
-  if (currentPhaseIndex !== undefined) {
-    const current = groups.find(
-      (group) => group.phase?.index === currentPhaseIndex,
-    );
-    if (current) return groupKey(current);
-  }
-  const running = groups.find((group) =>
-    group.agents.some((agent) => agent.state === "running"),
-  );
-  if (running) return groupKey(running);
-  const inFlight = groups.find(
-    (group) =>
-      group.agents.length > 0 &&
-      !group.agents.every((agent) => isSettledAgentState(agent.state)),
-  );
-  if (inFlight) return groupKey(inFlight);
-  for (let i = groups.length - 1; i >= 0; i--) {
-    const group = groups[i];
-    if (group && group.agents.length > 0) return groupKey(group);
-  }
-  return null;
-}
-
-function activityStateForPhase({
+function PhaseSection({
   group,
-  isActive,
-  terminalState,
-  workflowSettled,
+  settled,
+  currentPhaseIndex,
+  children,
 }: {
-  group: WorkflowPhaseGroup;
-  isActive: boolean;
-  terminalState?: "completed" | "failed" | "cancelled";
-  workflowSettled: boolean;
-}): ActivityRowState {
-  if (isActive && !workflowSettled) return "active";
-  if (group.agents.some((agent) => agent.state === "failed")) return "failed";
-  if (isActive && workflowSettled && terminalState !== undefined) {
-    if (terminalState === "completed") return "completed";
-    if (terminalState === "failed") return "failed";
-    return "muted";
-  }
-  if (group.agents.some((agent) => agent.state === "cancelled")) {
-    return "muted";
-  }
-  if (
-    group.agents.length > 0 &&
-    group.agents.every((agent) => isSettledAgentState(agent.state))
-  ) {
-    return "completed";
-  }
-  if (group.agents.length === 0) return "muted";
-  return "pending";
-}
-
-function PhaseCompletedBadge({ visible }: { visible: boolean }) {
-  if (!visible) return null;
-  return (
-    <Icon
-      name="CircleCheck"
-      className="ml-auto size-3.5 shrink-0 text-success/70"
-      aria-hidden="true"
-    />
-  );
-}
-
-function isPhaseCompleted(group: WorkflowPhaseGroup): boolean {
-  return (
-    group.agents.length > 0 &&
-    group.agents.every((agent) => agent.state === "done")
-  );
-}
-
-function StaticPhaseGroup({
-  group,
-  onAgentActivate,
-  workflowSettled,
-}: {
-  group: WorkflowPhaseGroup;
-  onAgentActivate?: (agent: WorkflowProgressAgent) => void;
-  workflowSettled: boolean;
+  group: PhaseGroup;
+  settled: boolean;
+  currentPhaseIndex?: number;
+  children: ReactNode;
 }) {
-  const agentLines = group.agents.map((agent) => (
-    <WorkflowAgentLine
-      key={agent.id ?? agent.index}
-      agent={agent}
-      onActivate={
-        onAgentActivate === undefined || !agent.actionable
-          ? undefined
-          : () => onAgentActivate(agent)
-      }
-      workflowSettled={workflowSettled}
-    />
-  ));
-  if (!group.phase) return <div>{agentLines}</div>;
-  const completed = isPhaseCompleted(group);
+  const state = phaseState(group, settled, currentPhaseIndex);
+  const [override, setOverride] = useState<boolean | null>(null);
+  const bodyId = useId();
+  const defaultExpanded =
+    state === "active" ||
+    group.agents.some((agent) => agentState(agent, settled) !== "done");
+  const expanded = override ?? defaultExpanded;
+  const summary =
+    group.agents.length === 0
+      ? state === "active"
+        ? "Active · no calls"
+        : "Not started"
+      : workflowCountLabel(group.agents, settled);
   return (
-    <div>
-      <div className="flex items-center gap-2 px-2 py-0.5">
-        <span
-          className={cn(
-            "text-xs font-medium",
-            completed ? "text-subtle-foreground" : "text-foreground",
-          )}
-        >
-          {group.phase.title}
-        </span>
-        <span className="text-xs tabular-nums text-subtle-foreground">
-          {phaseProgressLabel(group.agents)}
-        </span>
-        <PhaseCompletedBadge visible={completed} />
-      </div>
-      {agentLines}
-    </div>
-  );
-}
-
-function CollapsiblePhaseSection({
-  group,
-  expanded,
-  isActive,
-  onAgentActivate,
-  onToggle,
-  terminalState,
-  workflowSettled,
-}: {
-  group: WorkflowPhaseGroup;
-  expanded: boolean;
-  isActive: boolean;
-  onAgentActivate?: (agent: WorkflowProgressAgent) => void;
-  onToggle: () => void;
-  terminalState?: "completed" | "failed" | "cancelled";
-  workflowSettled: boolean;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!isActive) return;
-    const element = ref.current;
-    const scroller = element?.closest("[data-detail-scroll-area]");
-    if (element && scroller instanceof HTMLElement) {
-      scroller.scrollTop +=
-        element.getBoundingClientRect().top -
-        scroller.getBoundingClientRect().top -
-        ACTIVE_PHASE_SCROLL_OFFSET;
-    }
-  }, [isActive]);
-
-  const agentLines = group.agents.map((agent) => (
-    <WorkflowAgentLine
-      key={agent.id ?? agent.index}
-      agent={agent}
-      onActivate={
-        onAgentActivate === undefined || !agent.actionable
-          ? undefined
-          : () => onAgentActivate(agent)
-      }
-      promptStack
-      workflowSettled={workflowSettled}
-    />
-  ));
-  if (!group.phase) {
-    return (
-      <div ref={ref} className="flex min-w-0 flex-col">
-        {agentLines}
-      </div>
-    );
-  }
-
-  const progress = phaseProgressLabel(group.agents);
-  const activityState = activityStateForPhase({
-    group,
-    isActive,
-    terminalState,
-    workflowSettled,
-  });
-  if (group.agents.length === 0) {
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          "flex items-center gap-1.5",
-          promptStackActivityRowClass(activityState),
-        )}
-      >
-        <span className="size-3 shrink-0" aria-hidden="true" />
-        <span
-          className={promptStackActivityTextClass(
-            activityState,
-            "text-xs font-medium no-underline",
-          )}
-        >
-          {group.phase.title}
-        </span>
-        <span
-          className={cn(
-            "text-xs tabular-nums",
-            activityMetaClass(activityState),
-          )}
-        >
-          {progress}
-        </span>
-        <PhaseCompletedBadge visible={activityState === "completed"} />
-      </div>
-    );
-  }
-
-  return (
-    <div ref={ref}>
+    <section
+      data-workflow-phase={state}
+      className="relative min-w-0 pb-6 pl-7 last:pb-0 before:absolute before:bottom-1 before:left-2 before:top-6 before:w-px before:bg-border last:before:hidden"
+    >
+      <StateIcon state={state} className="absolute left-0.5 top-1" />
       <button
         type="button"
         aria-expanded={expanded}
-        onClick={onToggle}
+        aria-controls={bodyId}
+        onClick={() => setOverride(!expanded)}
         className={cn(
-          "flex w-full items-center gap-1.5 text-left transition-colors hover:bg-state-hover",
-          promptStackActivityRowClass(activityState),
+          "flex min-h-6 w-full min-w-0 items-start gap-2 rounded text-left hover:bg-state-hover",
+          WORKFLOW_FOCUS_CLASS,
         )}
       >
-        <Icon
-          name="ChevronDown"
-          className={cn(
-            "size-3 shrink-0 text-subtle-foreground transition-transform duration-200",
-            !expanded && "-rotate-90",
-            promptStackActivityIconClass(activityState),
-          )}
-          aria-hidden="true"
-        />
         <span
-          className={promptStackActivityTextClass(
-            activityState,
-            "text-xs font-medium no-underline",
+          className={cn(
+            "min-w-0 flex-1 break-words text-xs font-medium leading-6 [overflow-wrap:anywhere]",
+            state === "running" || state === "active"
+              ? "text-foreground"
+              : "text-muted-foreground",
           )}
         >
           {group.phase.title}
         </span>
-        <span
-          className={cn(
-            "text-xs tabular-nums",
-            activityMetaClass(activityState),
-          )}
-        >
-          {progress}
+        <span className="max-w-[45%] pt-1 text-right text-2xs leading-relaxed text-subtle-foreground">
+          {summary}
         </span>
-        <PhaseCompletedBadge visible={activityState === "completed"} />
+        <Icon
+          name="ChevronRight"
+          className={cn(
+            "mt-1.5 size-3 shrink-0 text-subtle-foreground",
+            expanded && "rotate-90",
+          )}
+          aria-hidden
+        />
       </button>
-      {expanded ? (
-        <div className="mt-1 flex min-w-0 flex-col">{agentLines}</div>
-      ) : null}
-    </div>
+      <div id={bodyId} hidden={!expanded} className="mt-2 min-w-0">
+        {group.phase.detail ? (
+          <p className="mb-1 break-words text-xs leading-relaxed text-subtle-foreground [overflow-wrap:anywhere]">
+            {group.phase.detail}
+          </p>
+        ) : null}
+        {group.agents.length === 0 ? (
+          <p className="text-xs text-subtle-foreground">
+            No agent calls started.
+          </p>
+        ) : (
+          children
+        )}
+      </div>
+    </section>
   );
-}
-
-function CollapsiblePhaseGroups({
-  currentPhaseIndex,
-  groups,
-  onAgentActivate,
-  terminalState,
-  workflowSettled,
-}: {
-  currentPhaseIndex?: number;
-  groups: readonly WorkflowPhaseGroup[];
-  onAgentActivate?: (agent: WorkflowProgressAgent) => void;
-  terminalState?: "completed" | "failed" | "cancelled";
-  workflowSettled: boolean;
-}) {
-  const activeKey = activePhaseKey(groups, currentPhaseIndex);
-  const [overrides, setOverrides] = useState<ReadonlyMap<string, boolean>>(
-    () => new Map(),
-  );
-  const defaultExpanded = (group: WorkflowPhaseGroup): boolean =>
-    workflowSettled
-      ? group.agents.some(
-          (agent) => agent.state !== "done" && agent.state !== "skipped",
-        )
-      : group.agents.some(
-          (agent) =>
-            !isSettledAgentState(agent.state) || agent.state === "failed",
-        );
-  const isExpanded = (key: string, group: WorkflowPhaseGroup): boolean =>
-    overrides.get(key) ?? defaultExpanded(group);
-  const toggle = (key: string, group: WorkflowPhaseGroup) =>
-    setOverrides((current) => {
-      const wasExpanded = current.get(key) ?? defaultExpanded(group);
-      const next = new Map(current);
-      next.set(key, !wasExpanded);
-      return next;
-    });
-
-  return groups.map((group) => {
-    const key = groupKey(group);
-    return (
-      <CollapsiblePhaseSection
-        key={key}
-        group={group}
-        expanded={isExpanded(key, group)}
-        isActive={key === activeKey}
-        onAgentActivate={onAgentActivate}
-        onToggle={() => toggle(key, group)}
-        terminalState={terminalState}
-        workflowSettled={workflowSettled}
-      />
-    );
-  });
 }
 
 export function WorkflowProgress({
-  collapsiblePhases = false,
   currentPhaseIndex,
   error,
   onAgentActivate,
   progress,
   settled,
-  terminalState,
+  compact = false,
 }: {
-  collapsiblePhases?: boolean;
   currentPhaseIndex?: number;
   error?: string | null;
   onAgentActivate?: (agent: WorkflowProgressAgent) => void;
   progress: WorkflowProgressSnapshot;
   settled: boolean;
-  terminalState?: "completed" | "failed" | "cancelled";
+  compact?: boolean;
 }) {
-  const groups = groupAgentsByPhase(progress.phases, progress.agents);
+  const [now, setNow] = useState(Date.now);
+  const ticking =
+    !compact &&
+    !settled &&
+    progress.agents.some((agent) => agent.state === "running");
+  useEffect(() => {
+    if (!ticking) return;
+    const interval = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [ticking]);
+  const agentLine = (agent: WorkflowProgressAgent) => (
+    <AgentLine
+      key={agent.id ?? agent.index}
+      agent={agent}
+      compact={compact}
+      settled={settled}
+      now={now}
+      onActivate={
+        onAgentActivate && agent.actionable
+          ? () => onAgentActivate(agent)
+          : undefined
+      }
+    />
+  );
   return (
-    <div
-      className={cn(
-        "flex flex-col",
-        collapsiblePhases ? "gap-1.5" : "gap-1 py-1",
-      )}
-    >
-      {collapsiblePhases ? (
-        <CollapsiblePhaseGroups
-          currentPhaseIndex={currentPhaseIndex}
-          groups={groups}
-          onAgentActivate={onAgentActivate}
-          terminalState={terminalState}
-          workflowSettled={settled}
-        />
+    <div className="min-w-0">
+      {compact ? (
+        <div className="grid gap-1">{progress.agents.map(agentLine)}</div>
       ) : (
-        groups.map((group) => (
-          <StaticPhaseGroup
-            key={groupKey(group)}
+        phaseGroups(progress).map((group) => (
+          <PhaseSection
+            key={group.phase.index}
             group={group}
-            onAgentActivate={onAgentActivate}
-            workflowSettled={settled}
-          />
+            settled={settled}
+            currentPhaseIndex={currentPhaseIndex}
+          >
+            {group.agents.map(agentLine)}
+          </PhaseSection>
         ))
       )}
       {error ? (
-        <div className="px-2 py-0.5 text-xs text-destructive/80">{error}</div>
+        <div
+          role="alert"
+          className="mt-3 break-words text-xs text-destructive-text [overflow-wrap:anywhere]"
+        >
+          {error}
+        </div>
       ) : null}
     </div>
   );
@@ -697,36 +405,17 @@ export function WorkflowProgress({
 
 export type WorkflowStatusPillState =
   | "queued"
+  | "running"
   | "completed"
   | "failed"
   | "cancelled";
-
-const STATUS_PILL: Record<
-  WorkflowStatusPillState,
-  { label: string; className: string; icon: IconName | null }
-> = {
-  queued: {
-    label: "Queued",
-    className: "bg-surface-recessed text-muted-foreground",
-    icon: null,
-  },
-  completed: {
-    label: "Complete",
-    className: "bg-success/10 text-success",
-    icon: "Check",
-  },
-  failed: {
-    label: "Failed",
-    className: "bg-destructive/10 text-destructive-text",
-    icon: "X",
-  },
-  cancelled: {
-    label: "Cancelled",
-    className: "bg-surface-recessed text-subtle-foreground",
-    icon: "Pause",
-  },
+const PILL: Record<WorkflowStatusPillState, { label: string; tone: string }> = {
+  queued: { label: "Queued", tone: "bg-secondary text-muted-foreground" },
+  running: { label: "Running", tone: "bg-primary/10 text-primary" },
+  completed: { label: "Completed", tone: "bg-success/10 text-success" },
+  failed: { label: "Failed", tone: "bg-destructive/10 text-destructive-text" },
+  cancelled: { label: "Stopped", tone: "bg-secondary text-muted-foreground" },
 };
-
 export function WorkflowStatusPill({
   state,
   className,
@@ -734,64 +423,19 @@ export function WorkflowStatusPill({
   state: WorkflowStatusPillState;
   className?: string;
 }) {
-  const entry = STATUS_PILL[state];
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-2xs font-medium",
-        entry.className,
+        "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-0.5 text-2xs font-medium",
+        PILL[state].tone,
         className,
       )}
     >
-      {entry.icon === null ? (
-        <span
-          className="size-1.5 shrink-0 rounded-full bg-muted-foreground/50"
-          aria-hidden="true"
-        />
-      ) : (
-        <Icon
-          name={entry.icon}
-          className="size-3 shrink-0"
-          aria-hidden="true"
-        />
-      )}
-      {entry.label}
+      <span className="size-1 shrink-0 rounded-full bg-current" aria-hidden />
+      {PILL[state].label}
     </span>
   );
 }
-
-type PhaseStripSegmentState = "done" | "active" | "failed" | "upcoming";
-
-function phaseStripSegmentState(
-  group: WorkflowPhaseGroup,
-  isCurrent: boolean,
-  workflowSettled: boolean,
-): PhaseStripSegmentState {
-  if (group.agents.some((agent) => agent.state === "failed")) return "failed";
-  const total = group.agents.length;
-  const settled = group.agents.filter((agent) =>
-    isSettledAgentState(agent.state),
-  ).length;
-  if (total > 0 && settled === total && (workflowSettled || !isCurrent)) {
-    return "done";
-  }
-  if (
-    (isCurrent && !workflowSettled) ||
-    group.agents.some((agent) => agent.state === "running") ||
-    settled > 0
-  ) {
-    return "active";
-  }
-  if (workflowSettled && total > 0) return "done";
-  return "upcoming";
-}
-
-const PHASE_STRIP_SEGMENT_CLASS: Record<PhaseStripSegmentState, string> = {
-  done: "bg-success/60",
-  active: "animate-pulse bg-foreground",
-  failed: "bg-destructive/70",
-  upcoming: "bg-muted-foreground/20",
-};
 
 export function WorkflowPhaseStrip({
   progress,
@@ -804,33 +448,45 @@ export function WorkflowPhaseStrip({
   settled: boolean;
   className?: string;
 }) {
-  const groups = groupAgentsByPhase(progress.phases, progress.agents).filter(
-    (group): group is WorkflowPhaseGroup & { phase: WorkflowProgressPhase } =>
-      group.phase !== null,
-  );
+  const groups = phaseGroups(progress);
   if (groups.length === 0) return null;
-  const runningKey = activePhaseKey(groups, currentPhaseIndex);
   return (
+    // Explicit roles avoid inheriting the enclosing message's Markdown list
+    // typography. This sequence also lives inside the composer toggle.
     <div
-      className={cn("flex gap-1", className)}
-      role="presentation"
-      aria-hidden="true"
+      role="list"
+      aria-label="Phase progression"
+      className={cn(
+        "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 text-2xs",
+        className,
+      )}
     >
-      {groups.map((group) => (
-        <span
-          key={group.phase.index}
-          className={cn(
-            "h-[3px] min-w-1 flex-1 rounded-full",
-            PHASE_STRIP_SEGMENT_CLASS[
-              phaseStripSegmentState(
-                group,
-                groupKey(group) === runningKey,
-                settled,
-              )
-            ],
-          )}
-        />
-      ))}
+      {groups.map((group, index) => {
+        const state = phaseState(group, settled, currentPhaseIndex);
+        return (
+          <div
+            role="listitem"
+            key={group.phase.index}
+            aria-label={`${group.phase.title}: ${STATE[state].label}`}
+            className="flex min-w-0 max-w-full items-center gap-2"
+          >
+            {index === 0 ? null : (
+              <span aria-hidden className="h-px w-4 shrink-0 bg-border" />
+            )}
+            <span
+              className={cn(
+                "flex min-w-0 items-start gap-1.5",
+                STATE[state].tone,
+              )}
+            >
+              <StateIcon state={state} className="mt-0.5 size-3" />
+              <span className="min-w-0 break-words leading-relaxed [overflow-wrap:anywhere]">
+                {group.phase.title}
+              </span>
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
