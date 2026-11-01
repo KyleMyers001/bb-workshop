@@ -89,6 +89,18 @@ The installer never changes theme selection. Compare `bb theme show --json`
 locally before/after; theme file conflicts require explicit resolution and
 preservation of any customized copies.
 
+## Workflows fork exception
+
+`plugins/workflows` uses plugin ID `workshop-workflows`, because BB reserves
+its builtin `workflows` ID. This is not a same-ID path migration: builtin
+settings and run history stay with the original plugin. Initial settings are
+copied only as an explicit cutover step; history and resume cache are not moved.
+Keep only one copy enabled, and never remove either ID to switch between them.
+Wait for all runs to finish before disabling the active copy. See the
+[Workflows README](../plugins/workflows/README.md#history-and-rollback) for
+non-destructive enable/disable rollback. Neither the public source nor source
+bundles preserve either plugin's runtime database.
+
 ## What this does not protect
 
 Git bundles preserve **committed source**, including theme files and the root

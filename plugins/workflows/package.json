@@ -1,0 +1,52 @@
+{
+  "name": "bb-plugin-workshop-workflows",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Run durable, provider-independent agent workflows.",
+  "engines": { "bb": ">=0.0", "bbPluginSdk": ">=0.6.88" },
+  "bb": {
+    "name": "Workshop Workflows",
+    "description": "Run durable, provider-independent agent workflows.",
+    "branding": { "icon": "Workflow" },
+    "server": "./src/server.ts",
+    "app": "./src/app.tsx",
+    "skills": ["skills"]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "sdk:check": "bb plugin types --check",
+    "build": "bb plugin build"
+  },
+  "dependencies": {
+    "@jitl/quickjs-singlefile-cjs-release-sync": "0.32.0",
+    "@radix-ui/react-slot": "^1.3.0",
+    "acorn": "8.16.0",
+    "acorn-walk": "^8.3.5",
+    "ajv": "^8.20.0",
+    "quickjs-emscripten-core": "0.32.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.104",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "better-sqlite3": "^12.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cron-parser": "^5.5.0",
+    "hono": "^4.11.9",
+    "jsdom": "^30.1.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.5"
+  }
+}
