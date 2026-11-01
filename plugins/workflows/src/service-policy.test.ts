@@ -1085,6 +1085,72 @@ describe("workflow service policy integration", () => {
     await worker;
   });
 
+  describe("permission modes set outside an inline agent() call", () => {
+    const tuple = `provider: "codex", model: "gpt-test", reasoningLevel: "medium"`;
+    it.each([
+      [
+        "an options variable",
+        `const options = { ${tuple}, permissionMode: "full" }; await agent("x", options);`,
+      ],
+      [
+        "an alias of agent",
+        `const call = agent; await call("x", { ${tuple}, permissionMode: "full" });`,
+      ],
+      [
+        "a conditional options expression",
+        `await agent("x", true ? { ${tuple}, permissionMode: "full" } : {});`,
+      ],
+    ])("rejects %s", async (_name, statement) => {
+      const test = setup();
+      harnesses.push(test.harness);
+      const run = await test.start(
+        source(`
+          try {
+            ${statement}
+            return "spawned";
+          } catch (error) {
+            return error.message;
+          }
+        `),
+      );
+      const controller = new AbortController();
+      const worker = test.service.runWorker(controller.signal);
+      await eventually(() =>
+        expect(getRunRequired(test.db, run.id).status).toBe("succeeded"),
+      );
+      expect(getRunRequired(test.db, run.id).resultJson).toContain(
+        "must be written inline",
+      );
+      expect(test.childCount()).toBe(0);
+      controller.abort();
+      await worker;
+    });
+
+    it("accepts the variable form when the source declares that tuple and mode", async () => {
+      const test = setup();
+      harnesses.push(test.harness);
+      const run = await test.start(
+        source(`
+          const options = { ${tuple}, permissionMode: "full" };
+          return await Promise.all([
+            agent("declared", { ${tuple}, permissionMode: "full" }),
+            agent("variable", options),
+          ]);
+        `),
+      );
+      const controller = new AbortController();
+      const worker = test.service.runWorker(controller.signal);
+      await eventually(() => expect(test.childCount()).toBe(2));
+      test.service.onThreadIdle("child-1", "a");
+      test.service.onThreadIdle("child-2", "b");
+      await eventually(() =>
+        expect(getRunRequired(test.db, run.id).status).toBe("succeeded"),
+      );
+      controller.abort();
+      await worker;
+    });
+  });
+
   it("lets later parallel siblings execute live after an identity failure", async () => {
     const test = setup();
     harnesses.push(test.harness);

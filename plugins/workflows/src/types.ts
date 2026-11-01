@@ -95,9 +95,19 @@ export interface WorkflowCapabilities {
   phase(title: string): void;
 }
 
+/** A selection written inline in an `agent()` call in the workflow's source. */
+export interface DeclaredAgentSelection {
+  provider: string;
+  model: string;
+  reasoningLevel: string;
+  permissionMode: string | null;
+}
+
 export interface ExecuteWorkflowScriptArgs {
   args: JsonValue;
   body: string;
+  /** Without an inline match here, a call cannot set a permission mode. */
+  declaredSelections?: readonly DeclaredAgentSelection[];
   capabilities: WorkflowCapabilities;
   limits?: Partial<WorkflowRuntimeLimits>;
   signal?: AbortSignal;

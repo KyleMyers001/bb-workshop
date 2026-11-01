@@ -294,7 +294,12 @@ function buildSharedWorkflowView(run: WorkflowRunView): SharedWorkflowView {
       call.startedAt !== null && call.finishedAt !== null
         ? Math.max(0, call.finishedAt - call.startedAt)
         : undefined,
-    metadata: [call.provider, shortModelName(call.model), call.reasoningLevel],
+    metadata: [
+      call.provider,
+      shortModelName(call.model),
+      call.reasoningLevel,
+      call.permissionMode,
+    ],
   }));
   return {
     callsById,

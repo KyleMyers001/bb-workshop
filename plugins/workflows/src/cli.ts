@@ -133,7 +133,7 @@ function inlineRunResult(run: WorkflowRunRow): {
 }
 
 function statusSummary(page: WorkflowRunInspectionPage) {
-  const { run, callCounts } = page;
+  const { run, callCounts, callPermissionModes } = page;
   const result = inlineRunResult(run);
   const name = boundedText(run.name, STATUS_DISPLAY_TEXT_MAX_BYTES);
   const phase = boundedText(run.phase, STATUS_DISPLAY_TEXT_MAX_BYTES);
@@ -188,6 +188,7 @@ function statusSummary(page: WorkflowRunInspectionPage) {
     error: error.value,
     errorTruncated: error.truncated,
     calls: callCounts,
+    callPermissionModes,
     notification: {
       outcome: run.notificationOutcome,
       attemptCount: run.notificationAttemptCount,

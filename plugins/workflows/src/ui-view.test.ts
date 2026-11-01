@@ -94,6 +94,7 @@ describe("workflow UI view", () => {
 
     const view = buildWorkflowRunView(inspection);
 
+    expect(view.phases[0]?.calls[0]?.permissionMode).toBe("full");
     expect(view.phases.map((phase) => phase.title)).toEqual([
       "Declared",
       "Dynamic B",

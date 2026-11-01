@@ -3,7 +3,12 @@ import {
   makePluginAgentConfigurationContext,
 } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it } from "vitest";
-import { getCall, getRunRequired, migrations } from "./data.js";
+import {
+  countCallPermissionModes,
+  getCall,
+  getRunRequired,
+  migrations,
+} from "./data.js";
 import plugin from "./server.js";
 import { createWorkflowService } from "./service.js";
 
@@ -900,6 +905,10 @@ describe("workflow resume cache integration", () => {
     expect(getCall(test.db, run.id, 0)?.cacheKey).not.toBe(
       getCall(test.db, run.id, 1)?.cacheKey,
     );
+    expect(countCallPermissionModes(test.db, run.id)).toEqual({
+      "accept-edits": 1,
+      full: 1,
+    });
     await test.finish("cache-child-1", "a");
     await test.finish("cache-child-2", "b");
     await eventually(() =>

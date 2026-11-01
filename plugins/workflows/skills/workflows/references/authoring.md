@@ -136,17 +136,28 @@ await agent("Review the change", {
 });
 ```
 
-`permissionMode` is `accept-edits`, `auto`, or `full`, must be a string literal,
-and requires the provider, model, and reasoning tuple. It applies to that call
-only and can raise the worker above the origin's mode, so use it only when the
-worker needs it and tell the user which calls run on `full`. Check a provider's
-modes with `bb provider list`, under `capabilities.permissionModes`.
+`permissionMode` is `accept-edits`, `auto`, or `full` and applies to that call
+only. Check a provider's modes with `bb provider list`, under
+`capabilities.permissionModes`.
+
+The mode must be a string literal, written inline in an `agent()` call alongside
+the provider, model, and reasoning tuple. A call that sets it any other way, such
+as through an options variable, an alias of `agent`, or `args`, throws unless the
+source also has an inline call with the same tuple and mode. This keeps every
+mode a workflow can use readable in its source. A workflow's `args` can still
+choose between calls that are written out.
+
+Nothing asks the user before a call runs above the origin's mode, and the plugin
+does not cap it. The source shows the requested mode, and the workflow card,
+inspector, and `bb workflows status` (`callPermissionModes`) show what each call
+resolved to. Set it only when the worker needs it, and tell the user which calls
+run above the origin's mode before starting the run.
 
 `bb workflows validate` and `bb workflows run` reject a literal tuple whose
 explicit or inherited mode the provider lacks. Selections they cannot see, such
-as options built at runtime, fail when the call starts. That rejection creates
-no call record, and `parallel()` reduces it to `null`, so catch the error in the
-thunk when the reason matters.
+as an inherited mode on options built at runtime, fail when the call starts. That
+rejection creates no call record, and `parallel()` reduces it to `null`, so catch
+the error in the thunk when the reason matters.
 
 ## Structured agent results
 

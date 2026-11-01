@@ -19,6 +19,7 @@ const workflowCallViewSchema = z
     provider: z.string(),
     model: z.string(),
     reasoningLevel: z.string(),
+    permissionMode: z.string(),
     cached: z.boolean(),
     childThreadId: z.string().nullable(),
     providerRetryAttempts: z.number().int().nonnegative(),

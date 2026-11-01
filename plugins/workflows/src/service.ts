@@ -20,6 +20,7 @@ import {
   beginNotificationAttempt,
   cancelRun,
   claimQueuedRun,
+  countCallPermissionModes,
   countCallsForRun,
   createRun,
   deleteTerminalRuns,
@@ -53,7 +54,7 @@ import {
   type WorkflowCallRow,
   type WorkflowRunRow,
 } from "./data.js";
-import { parseWorkflowSource } from "./parser.js";
+import { inspectWorkflowSource, parseWorkflowSource } from "./parser.js";
 import { executeWorkflowScript } from "./runtime.js";
 import {
   DEFAULT_WORKFLOW_SETTINGS,
@@ -384,6 +385,7 @@ export interface WorkflowRunInspectionPage {
   run: WorkflowRunRow;
   calls: WorkflowCallInspection[];
   callCounts: WorkflowCallCounts;
+  callPermissionModes: Record<string, number>;
 }
 
 export function createWorkflowService(
@@ -699,6 +701,7 @@ export function createWorkflowService(
         limit,
       }).map(inspectCall),
       callCounts: countCallsForRun(db, runId),
+      callPermissionModes: countCallPermissionModes(db, runId),
     };
   }
 
@@ -1366,7 +1369,9 @@ export function createWorkflowService(
     run: WorkflowRunRow,
     signal: AbortSignal,
   ): Promise<void> {
-    const parsed = parseWorkflowSource(run.source);
+    const { workflow: parsed, literalSelections } = inspectWorkflowSource(
+      run.source,
+    );
     const runSettings = settingsForRun(run);
     let callIndex = 0;
     const replay = { prefix: true };
@@ -1441,7 +1446,8 @@ export function createWorkflowService(
             workflowReferenceToSourceInput(reference),
           );
           throwIfCancelled(context.signal);
-          const child = parseWorkflowSource(prepared.source);
+          const { workflow: child, literalSelections: childSelections } =
+            inspectWorkflowSource(prepared.source);
           if (child.metadata.inputSchema !== null) {
             const validation = validateValue(
               child.metadata.inputSchema,
@@ -1456,6 +1462,7 @@ export function createWorkflowService(
           const execution = executeWorkflowScript({
             args: childArgs,
             body: child.body,
+            declaredSelections: childSelections,
             capabilities,
             signal: context.signal,
             depth: context.depth,
@@ -1503,6 +1510,7 @@ export function createWorkflowService(
       const result = await executeWorkflowScript({
         args: parseJson(run.argsJson, "workflow args"),
         body: parsed.body,
+        declaredSelections: literalSelections,
         signal,
         capabilities,
         limits: {

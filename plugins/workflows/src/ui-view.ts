@@ -29,6 +29,7 @@ function callView(
     provider: call.execution.provider,
     model: call.execution.model,
     reasoningLevel: call.execution.reasoningLevel,
+    permissionMode: call.execution.permissionMode,
     cached: call.source === "cached",
     childThreadId: call.childThreadId,
     providerRetryAttempts: call.providerRetryAttempts,
