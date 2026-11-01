@@ -1,3 +1,6 @@
+export const WORKFLOW_FOCUS_CLASS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
+
 export const CHROME_SECTION_LABEL_CLASS =
   "text-xs font-normal leading-5 text-subtle-foreground/75";
 

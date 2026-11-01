@@ -1,20 +1,12 @@
 import {
-  useCallback,
   useEffect,
   useId,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
   type RefObject,
 } from "react";
-import {
-  activityIconClass,
-  activityMetaClass,
-  activityRowClass,
-  activityTextClass,
-  type ActivityRowState,
-} from "@/components/ui/activity-row-styles";
+import { WORKFLOW_FOCUS_CLASS } from "@/components/ui/chrome-style-tokens";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
@@ -35,9 +27,13 @@ import {
   type WorkflowProgressAgentState,
   type WorkflowProgressSnapshot,
   type WorkflowStatusPillState,
+  workflowCounts,
+  workflowCountLabel,
 } from "@/components/ui/workflow-progress";
 import {
   experimental_useAppPanel,
+  experimental_usePanelTabs,
+  experimental_usePluginId,
   definePluginApp,
   useBbNavigate,
   useComposer,
@@ -70,7 +66,7 @@ interface SharedWorkflowView {
 const WORKFLOW_PANEL_ACTION_ID = "workflow-run";
 const WORKFLOW_CARD_ROW_HEIGHT = 32;
 const WORKFLOW_HEADER_BUTTON_CLASS =
-  "flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-none bg-transparent px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-background/80";
+  "flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-none bg-transparent px-3 py-2 text-xs text-foreground transition-colors hover:bg-state-hover";
 const WORKFLOW_OPEN_BUTTON_CLASS =
   "flex min-h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-none border-l border-border/35 bg-transparent text-muted-foreground transition-colors hover:text-foreground";
 
@@ -103,40 +99,14 @@ function isRunActive(run: WorkflowRunView): boolean {
   return run.status === "queued" || run.status === "running";
 }
 
-function runTerminalState(
-  run: WorkflowRunView,
-): "completed" | "failed" | "cancelled" | undefined {
-  switch (run.status) {
-    case "succeeded":
-      return "completed";
-    case "failed":
-      return "failed";
-    case "cancelled":
-      return "cancelled";
-    case "queued":
-    case "running":
-      return undefined;
-  }
-}
-
-function settledAgentCount(agents: readonly WorkflowProgressAgent[]): number {
-  return agents.filter(
-    (agent) =>
-      agent.state === "done" ||
-      agent.state === "failed" ||
-      agent.state === "skipped" ||
-      agent.state === "cancelled",
-  ).length;
-}
-
 function runPillState(
   status: WorkflowRunView["status"],
-): WorkflowStatusPillState | null {
+): WorkflowStatusPillState {
   switch (status) {
     case "queued":
       return "queued";
     case "running":
-      return null;
+      return "running";
     case "succeeded":
       return "completed";
     case "failed":
@@ -146,18 +116,62 @@ function runPillState(
   }
 }
 
-function runActivityState(run: WorkflowRunView): ActivityRowState {
-  switch (run.status) {
-    case "queued":
-    case "running":
-      return "active";
-    case "succeeded":
-      return "completed";
-    case "failed":
-      return "failed";
-    case "cancelled":
-      return "muted";
-  }
+function runActivity(run: WorkflowRunView, shared: SharedWorkflowView): string {
+  if (run.status === "succeeded") return "Completed";
+  if (run.status === "failed") return "Failed";
+  if (run.status === "cancelled") return "Stopped";
+  if (run.status === "queued") return "Waiting to start";
+  const active = shared.progress.phases.filter((phase) =>
+    shared.progress.agents.some(
+      (agent) => agent.phaseIndex === phase.index && agent.state === "running",
+    ),
+  );
+  return (
+    active.map((phase) => phase.title).join(" · ") ||
+    run.currentPhase ||
+    "Starting"
+  );
+}
+
+function RunActivity({
+  run,
+  shared,
+}: {
+  run: WorkflowRunView;
+  shared: SharedWorkflowView;
+}) {
+  const settled = !isRunActive(run);
+  const counts = workflowCounts(shared.progress.agents, settled);
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-2xs text-muted-foreground">
+      <span className="min-w-0 break-words font-medium text-foreground [overflow-wrap:anywhere]">
+        {runActivity(run, shared)}
+      </span>
+      <span aria-hidden>·</span>
+      <span>
+        {!settled
+          ? `${counts.running} ${counts.running === 1 ? "agent" : "agents"} running`
+          : workflowCountLabel(shared.progress.agents, settled)}
+      </span>
+      {run.startedAt === null ? null : (
+        <span className="ml-auto whitespace-nowrap tabular-nums text-subtle-foreground">
+          {settled && run.finishedAt === null ? (
+            "Duration unavailable"
+          ) : (
+            <>
+              <span>
+                <RunDuration
+                  startedAt={run.startedAt}
+                  finishedAt={run.finishedAt}
+                />
+              </span>
+              {settled ? " total" : " elapsed"}
+            </>
+          )}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function formatDuration(startedAt: number | null, finishedAt: number | null) {
@@ -187,12 +201,6 @@ function useNow(ticking: boolean): number {
   return now;
 }
 
-function WorkflowDuration({ startedAt }: { startedAt: number }) {
-  const elapsed = useNow(true) - startedAt;
-  if (elapsed <= 1_000) return null;
-  return <>{formatDuration(0, elapsed)}</>;
-}
-
 function RunDuration({
   startedAt,
   finishedAt,
@@ -211,67 +219,17 @@ function WorkflowDetailScroll({
   currentPhaseIndex?: number;
   progress: WorkflowProgressSnapshot;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [overflow, setOverflow] = useState({ above: false, below: false });
-  const contentKey = progress.agents
-    .map((agent) => `${agent.index}:${agent.state}:${agent.lastProgressAt}`)
-    .join("|");
-  const updateOverflow = useCallback(() => {
-    const element = scrollRef.current;
-    if (element === null) return;
-    const nextOverflow = {
-      above: element.scrollTop > 1,
-      below:
-        element.scrollTop + element.clientHeight < element.scrollHeight - 1,
-    };
-    setOverflow((currentOverflow) =>
-      currentOverflow.above === nextOverflow.above &&
-      currentOverflow.below === nextOverflow.below
-        ? currentOverflow
-        : nextOverflow,
-    );
-  }, []);
-
-  useEffect(() => {
-    updateOverflow();
-    const element = scrollRef.current;
-    if (element === null || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(updateOverflow);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [contentKey, updateOverflow]);
-
   return (
-    <div className="relative isolate min-w-0" data-detail-scroll="base">
-      <div
-        ref={scrollRef}
-        onScroll={updateOverflow}
-        data-detail-scroll-area="base"
-        className="max-h-[288px] min-w-0 overflow-x-auto overflow-y-auto px-2.5 py-2"
-      >
-        <div aria-hidden className="-mb-px h-px w-full" />
-        <WorkflowProgress
-          progress={progress}
-          settled={false}
-          collapsiblePhases
-          currentPhaseIndex={currentPhaseIndex}
-        />
-        <div aria-hidden className="h-px w-full" />
-      </div>
-      {overflow.above ? (
-        <div
-          aria-hidden
-          data-detail-scroll-fade="above"
-          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-gradient-to-b from-background to-transparent"
-        />
-      ) : null}
-      {overflow.below ? (
-        <div
-          aria-hidden
-          data-detail-scroll-fade="below"
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-6 bg-gradient-to-t from-background to-transparent"
-        />
-      ) : null}
+    <div
+      data-detail-scroll-area="base"
+      className="max-h-72 min-w-0 overflow-y-auto px-3 py-2"
+    >
+      <WorkflowProgress
+        progress={progress}
+        settled={false}
+        compact
+        currentPhaseIndex={currentPhaseIndex}
+      />
     </div>
   );
 }
@@ -301,6 +259,7 @@ function buildSharedWorkflowView(run: WorkflowRunView): SharedWorkflowView {
   const phases = run.phases.map((phase, index) => ({
     index: index + 1,
     title: phase.title,
+    detail: phase.detail,
   }));
   const otherWorkIndex =
     run.unphasedCalls.length === 0 ? null : phases.length + 1;
@@ -308,7 +267,7 @@ function buildSharedWorkflowView(run: WorkflowRunView): SharedWorkflowView {
     phases.map((phase) => [phase.title, phase.index] as const),
   );
   if (otherWorkIndex !== null) {
-    phases.push({ index: otherWorkIndex, title: "Other work" });
+    phases.push({ index: otherWorkIndex, title: "Other work", detail: null });
   }
   const calls = [
     ...run.phases.flatMap((phase) => phase.calls),
@@ -330,6 +289,7 @@ function buildSharedWorkflowView(run: WorkflowRunView): SharedWorkflowView {
         ? (otherWorkIndex ?? undefined)
         : phaseIndexByTitle.get(call.phase),
     error: call.error ?? undefined,
+    startedAt: call.startedAt ?? undefined,
     durationMs:
       call.startedAt !== null && call.finishedAt !== null
         ? Math.max(0, call.finishedAt - call.startedAt)
@@ -392,7 +352,10 @@ function useActiveWorkflowRuns(threadId: string): WorkflowRunView[] {
 
 export function EmptyOrError({ children }: { children: ReactNode }) {
   return (
-    <div role="alert" className="text-sm text-muted-foreground">
+    <div
+      role="alert"
+      className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]"
+    >
       {children}
     </div>
   );
@@ -416,7 +379,7 @@ function RefreshWarning({ message }: { message: string }) {
   return (
     <div
       role="status"
-      className="rounded-md border border-warning/20 bg-warning/5 px-2.5 py-1.5 text-xs text-warning-text"
+      className="break-words rounded-md border border-warning/20 bg-warning/5 px-2.5 py-1.5 text-xs text-warning-text [overflow-wrap:anywhere]"
     >
       Could not refresh: {message}.
     </div>
@@ -436,45 +399,44 @@ function WorkflowStatusBanner() {
 
 function WorkflowComposerSummary({ run }: { run: WorkflowRunView }) {
   const shared = buildSharedWorkflowView(run);
-  const settledAgents = settledAgentCount(shared.progress.agents);
-  const agentCount = shared.progress.agents.length;
+  const counts = workflowCounts(shared.progress.agents);
   return (
     <>
       <Icon
         name="Workflow"
-        className={activityIconClass("active", "size-3.5 shrink-0")}
+        className="size-3.5 shrink-0 text-primary"
         aria-hidden
       />
-      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
-        <span
-          className="min-w-0 truncate font-medium text-foreground"
-          title={run.name}
-        >
-          {run.name}
-        </span>
-        {agentCount === 0 ? null : (
-          <span className="shrink-0 text-2xs tabular-nums text-subtle-foreground">
-            {settledAgents}/{agentCount} agents
+      <div className="min-w-0 flex-1 space-y-1.5 text-left">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span
+            className="min-w-0 flex-1 truncate font-medium text-foreground"
+            title={run.name}
+          >
+            {run.name}
           </span>
-        )}
-        {run.startedAt === null ? null : (
-          <span className="shrink-0 text-2xs tabular-nums text-subtle-foreground">
-            <WorkflowDuration startedAt={run.startedAt} />
+          <span className="text-2xs text-subtle-foreground">
+            {counts.running} running
           </span>
-        )}
-      </span>
-      <WorkflowPhaseStrip
-        progress={shared.progress}
-        currentPhaseIndex={shared.currentPhaseIndex}
-        settled={false}
-        className="w-16 shrink-0"
-      />
+          {run.startedAt === null ? (
+            <span className="text-2xs text-subtle-foreground">Queued</span>
+          ) : (
+            <span className="whitespace-nowrap text-2xs tabular-nums text-subtle-foreground">
+              <RunDuration startedAt={run.startedAt} finishedAt={null} />
+            </span>
+          )}
+        </div>
+        <WorkflowPhaseStrip
+          progress={shared.progress}
+          currentPhaseIndex={shared.currentPhaseIndex}
+          settled={false}
+        />
+      </div>
     </>
   );
 }
 
 function WorkflowComposerCard({ run }: { run: WorkflowRunView }) {
-  const navigate = useBbNavigate();
   const panel = experimental_useAppPanel();
   const [expanded, setExpanded] = useState(false);
   const bodyId = useId();
@@ -487,7 +449,7 @@ function WorkflowComposerCard({ run }: { run: WorkflowRunView }) {
   return (
     <section
       aria-label="Workflow"
-      className="overflow-hidden rounded-lg border border-border bg-surface-raised-solid"
+      className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface-raised-solid"
       style={{ minHeight: WORKFLOW_CARD_ROW_HEIGHT }}
     >
       <div
@@ -506,6 +468,7 @@ function WorkflowComposerCard({ run }: { run: WorkflowRunView }) {
           className={cn(
             WORKFLOW_HEADER_BUTTON_CLASS,
             PROMPT_STACK_DISCLOSURE_TRIGGER_CLASS,
+            WORKFLOW_FOCUS_CLASS,
           )}
         >
           <WorkflowComposerSummary run={run} />
@@ -525,7 +488,7 @@ function WorkflowComposerCard({ run }: { run: WorkflowRunView }) {
               params: { runId: run.id },
             })
           }
-          className={WORKFLOW_OPEN_BUTTON_CLASS}
+          className={cn(WORKFLOW_OPEN_BUTTON_CLASS, WORKFLOW_FOCUS_CLASS)}
         >
           <Icon name="ArrowRight" className="size-3.5" aria-hidden />
         </button>
@@ -551,6 +514,7 @@ function WorkflowComposerCard({ run }: { run: WorkflowRunView }) {
           <div className="px-1 pb-1">
             <PromptStackCollapseRow
               buttonRef={focus.collapseRef}
+              className={WORKFLOW_FOCUS_CLASS}
               controlsId={bodyId}
               label={`Collapse workflow ${run.name}`}
               onCollapse={focus.onCollapseClick}
@@ -576,7 +540,7 @@ function WorkflowStackFront({
     <PromptStackPeekLayers hiddenCount={runs.length - 1}>
       <section
         aria-label="Workflows"
-        className="overflow-hidden rounded-lg border border-border bg-surface-raised-solid"
+        className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface-raised-solid"
         style={{ minHeight: WORKFLOW_CARD_ROW_HEIGHT }}
       >
         <button
@@ -588,6 +552,7 @@ function WorkflowStackFront({
           className={cn(
             WORKFLOW_HEADER_BUTTON_CLASS,
             PROMPT_STACK_DISCLOSURE_TRIGGER_CLASS,
+            WORKFLOW_FOCUS_CLASS,
             "w-full",
           )}
         >
@@ -600,7 +565,24 @@ function WorkflowStackFront({
 }
 
 function WorkflowStatusBannerLoaded({ threadId }: { threadId: string }) {
-  const runs = useActiveWorkflowRuns(threadId);
+  const activeRuns = useActiveWorkflowRuns(threadId);
+  const pluginId = experimental_usePluginId();
+  const tabs = experimental_usePanelTabs();
+  const selected = tabs.tabs.find(
+    (tab) => tab.key === tabs.selectedKey,
+  )?.detail;
+  const inspectingRunId =
+    tabs.open &&
+    selected?.kind === "plugin" &&
+    selected.pluginId === pluginId &&
+    selected.tab.id === WORKFLOW_PANEL_ACTION_ID &&
+    selected.tab.context.kind === "thread" &&
+    selected.tab.availability === "action"
+      ? panelRunId(selected.params)
+      : undefined;
+  // The expanded chat card stays intact; only the duplicate composer banner
+  // for the inspected run is omitted. Other active runs retain their stack.
+  const runs = activeRuns.filter((run) => run.id !== inspectingRunId);
   const [stackExpanded, setStackExpanded] = useState(false);
   const listId = useId();
   const focus = useDisclosureFocusHandoff(stackExpanded, () =>
@@ -614,7 +596,10 @@ function WorkflowStatusBannerLoaded({ threadId }: { threadId: string }) {
 
   const collapsed = runs.length > 1 && !stackExpanded;
   return (
-    <section aria-label="Active workflows" className="flex flex-col gap-2">
+    <section
+      aria-label="Active workflows"
+      className="flex min-w-0 flex-col gap-2"
+    >
       {collapsed ? (
         <WorkflowStackFront
           runs={runs}
@@ -622,8 +607,8 @@ function WorkflowStatusBannerLoaded({ threadId }: { threadId: string }) {
           onExpand={focus.onTriggerClick}
         />
       ) : null}
-      <div hidden={collapsed} className="flex flex-col gap-1">
-        <div id={listId} className="flex flex-col gap-2">
+      <div hidden={collapsed} className="flex min-w-0 flex-col gap-1">
+        <div id={listId} className="flex min-w-0 flex-col gap-2">
           {runs.map((run) => (
             <WorkflowComposerCard key={run.id} run={run} />
           ))}
@@ -631,6 +616,7 @@ function WorkflowStatusBannerLoaded({ threadId }: { threadId: string }) {
         {runs.length > 1 && stackExpanded ? (
           <PromptStackCollapseRow
             buttonRef={focus.collapseRef}
+            className={WORKFLOW_FOCUS_CLASS}
             controlsId={listId}
             label={`Collapse ${runs.length} workflows`}
             onCollapse={focus.onCollapseClick}
@@ -676,9 +662,7 @@ function WorkflowPreviewLoaded({
   const navigate = useBbNavigate();
   const panel = experimental_useAppPanel();
   const { state } = useWorkflowRun(threadId, runId);
-  const [expanded, setExpanded] = useState(true);
-  const bodyId = useId();
-  const toggleId = useId();
+
   if (state.status === "loading") return <LoadingPreview />;
   if (state.status === "error") {
     return <EmptyOrError>{state.message}</EmptyOrError>;
@@ -688,129 +672,69 @@ function WorkflowPreviewLoaded({
   }
   const run = state.run;
   const shared = buildSharedWorkflowView(run);
-  const activityState = runActivityState(run);
-  const pillState = runPillState(run.status);
-  const settledAgents = settledAgentCount(shared.progress.agents);
+  const settled = !isRunActive(run);
   return (
     <section
-      className="my-2 overflow-hidden rounded-lg border border-border bg-surface-recessed"
+      className="my-2 min-w-0 overflow-hidden rounded-lg border border-border bg-surface-raised-solid"
       title={source}
       aria-label="Workflow"
     >
-      <button
-        type="button"
-        id={toggleId}
-        aria-expanded={expanded}
-        aria-controls={bodyId}
-        aria-label={`Workflow: ${run.name}`}
-        onClick={() => setExpanded((value) => !value)}
-        className={activityRowClass(
-          activityState,
-          "flex min-h-8 w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-none px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-background/80",
-        )}
-      >
-        <Icon
-          name="Workflow"
-          className={activityIconClass(activityState, "size-3.5 shrink-0")}
-          aria-hidden
-        />
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
-          <span
-            className={activityTextClass(
-              activityState,
-              "min-w-0 truncate no-underline",
-            )}
-            title={run.name}
+      <div className="min-w-0 px-4 pb-3 pt-4">
+        <header className="flex min-w-0 items-start gap-2.5">
+          <Icon
+            name="Workflow"
+            className="mt-0.5 size-4 shrink-0 text-primary"
+            aria-hidden
+          />
+          <div
+            role="heading"
+            aria-level={3}
+            className="min-w-0 flex-1 break-words text-sm font-medium leading-relaxed text-foreground [overflow-wrap:anywhere]"
           >
             {run.name}
-          </span>
-          {shared.progress.agents.length > 0 ? (
-            <span
-              className={activityMetaClass(
-                activityState,
-                "shrink-0 text-2xs tabular-nums",
-              )}
-            >
-              {settledAgents}/{shared.progress.agents.length} agents
-            </span>
-          ) : null}
-          {run.startedAt === null ? null : (
-            <span
-              className={activityMetaClass(
-                activityState,
-                "shrink-0 text-2xs tabular-nums",
-              )}
-            >
-              <RunDuration
-                startedAt={run.startedAt}
-                finishedAt={run.finishedAt}
-              />
-            </span>
-          )}
-        </span>
-        {pillState === null ? null : <WorkflowStatusPill state={pillState} />}
-        <Icon
-          name="ChevronDown"
-          className={cn(
-            activityIconClass(activityState),
-            "size-3.5 shrink-0 transition-transform duration-200",
-            expanded && "rotate-180",
-          )}
-          aria-hidden
-        />
-      </button>
-      <WorkflowPhaseStrip
-        progress={shared.progress}
-        currentPhaseIndex={shared.currentPhaseIndex}
-        settled={!isRunActive(run)}
-        className="px-3 pb-2"
-      />
-      <section
-        id={bodyId}
-        role="region"
-        aria-labelledby={toggleId}
-        aria-hidden={!expanded}
-        inert={!expanded}
-        className={cn(
-          "grid overflow-hidden transition-[grid-template-rows,opacity,border-color] duration-200 ease-out",
-          expanded
-            ? "grid-rows-[1fr] border-t border-border opacity-100"
-            : "pointer-events-none grid-rows-[0fr] opacity-0",
-        )}
-      >
-        <div className="overflow-hidden bg-popover">
-          <div
-            data-detail-scroll-area="base"
-            className="max-h-[288px] overflow-y-auto px-2.5 py-2"
-          >
-            <WorkflowProgress
-              progress={shared.progress}
-              settled={!isRunActive(run)}
-              error={run.error}
-              collapsiblePhases
-              currentPhaseIndex={shared.currentPhaseIndex}
-              terminalState={runTerminalState(run)}
-              onAgentActivate={(agent) =>
-                activateWorkflowAgent(agent, shared.callsById, (threadId) =>
-                  navigate.toThread(threadId),
-                )
-              }
-            />
           </div>
+          <WorkflowStatusPill state={runPillState(run.status)} />
+        </header>
+        <div className="mt-2.5">
+          <RunActivity run={run} shared={shared} />
         </div>
-      </section>
+        <WorkflowPhaseStrip
+          progress={shared.progress}
+          currentPhaseIndex={shared.currentPhaseIndex}
+          settled={settled}
+          className="mb-3 mt-4"
+        />
+        <div
+          data-detail-scroll-area="base"
+          className="max-h-72 min-w-0 overflow-y-auto"
+        >
+          <WorkflowProgress
+            progress={shared.progress}
+            settled={settled}
+            compact
+            error={run.error}
+            onAgentActivate={(agent) =>
+              activateWorkflowAgent(agent, shared.callsById, (id) =>
+                navigate.toThread(id),
+              )
+            }
+          />
+        </div>
+      </div>
       {state.refreshError === null ? null : (
         <div className="border-t border-border-seam bg-popover px-3 py-2">
           <RefreshWarning message={state.refreshError} />
         </div>
       )}
-      <div className="flex min-h-9 items-center border-t border-border-seam bg-popover px-2">
-        <span className="flex-1" />
+      <footer className="flex min-h-10 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border-hairline px-4 py-1.5">
+        <span className="min-w-0 text-2xs text-subtle-foreground">
+          {workflowCountLabel(shared.progress.agents, settled)}
+        </span>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-xs"
+          className="ml-auto h-7 px-2 text-xs"
           onClick={() =>
             panel.openTab({
               tab: {
@@ -823,10 +747,10 @@ function WorkflowPreviewLoaded({
             })
           }
         >
-          Open in right panel
+          Inspect run
           <Icon name="ArrowRight" className="size-3" aria-hidden />
         </Button>
-      </div>
+      </footer>
     </section>
   );
 }
@@ -837,7 +761,7 @@ function WorkflowRunPanel({
 }: ExperimentalThreadActionTabProps) {
   const runId = panelRunId(params);
   return (
-    <div className="h-full min-h-0 flex-1 bg-border">
+    <div className="h-full min-h-0 flex-1 bg-background">
       {runId === undefined ? (
         <WorkflowRunPanelState>
           <EmptyOrError>
@@ -894,11 +818,11 @@ function WorkflowRunPanelLoaded({
       </WorkflowRunPanelState>
     );
   }
-  const pillState = runPillState(run.status);
-  const settledAgents = settledAgentCount(shared.progress.agents);
-  const completedCalls = shared.progress.agents.filter(
-    (agent) => agent.state === "done",
-  ).length;
+  const settled = !isRunActive(run);
+  const completedCalls = workflowCounts(
+    shared.progress.agents,
+    settled,
+  ).completed;
   const cachedCalls = shared.progress.agents.filter(
     (agent) => agent.cached,
   ).length;
@@ -915,51 +839,47 @@ function WorkflowRunPanelLoaded({
     }
   };
   return (
-    <div className="flex h-full min-h-0 flex-col bg-border">
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-background">
       <div
         data-detail-scroll-area="workflow-panel"
-        className="min-h-0 flex-1 overflow-y-auto p-4"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto p-6"
       >
-        <div className="flex items-start gap-2">
+        <header className="flex min-w-0 items-start gap-3">
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-medium text-foreground">
+            <h2 className="break-words text-base font-semibold leading-relaxed text-foreground [overflow-wrap:anywhere]">
               {run.name}
             </h2>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {run.description}
-            </p>
+            {run.description ? (
+              <p className="mt-2 break-words text-xs leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
+                {run.description}
+              </p>
+            ) : null}
           </div>
-          {pillState === null ? null : <WorkflowStatusPill state={pillState} />}
+          {settled ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2 text-2xs text-muted-foreground hover:text-destructive-text"
+              aria-label="Stop workflow"
+              disabled={stopping}
+              onClick={() => void stop()}
+            >
+              <Icon name="Square" className="size-2.5" aria-hidden />
+              {stopping ? "Stopping…" : "Stop"}
+            </Button>
+          )}
+        </header>
+        <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2">
+          <WorkflowStatusPill state={runPillState(run.status)} />
+          <div className="min-w-0 flex-1">
+            <RunActivity run={run} shared={shared} />
+          </div>
         </div>
-        <div className="mt-2 flex items-center gap-2 text-2xs tabular-nums text-subtle-foreground">
-          <span>
-            {shared.progress.agents.length > 0
-              ? `${settledAgents}/${shared.progress.agents.length} agents · `
-              : ""}
-            {run.startedAt === null ? (
-              "Not started"
-            ) : (
-              <>
-                <RunDuration
-                  startedAt={run.startedAt}
-                  finishedAt={run.finishedAt}
-                />{" "}
-                {isRunActive(run) ? "elapsed" : "total"}
-              </>
-            )}
-          </span>
-          <span className="ml-auto font-mono">{run.id.slice(-8)}</span>
-        </div>
-        <WorkflowPhaseStrip
-          progress={shared.progress}
-          currentPhaseIndex={shared.currentPhaseIndex}
-          settled={!isRunActive(run)}
-          className="mt-3"
-        />
         {stopError === null ? null : (
           <div
             role="alert"
-            className="mt-3 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive-text"
+            className="mt-3 break-words rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive-text [overflow-wrap:anywhere]"
           >
             {stopError}
           </div>
@@ -969,18 +889,16 @@ function WorkflowRunPanelLoaded({
             <RefreshWarning message={state.refreshError} />
           </div>
         )}
-        <div className="my-4 h-px bg-border-seam" />
-        <h3 className="mb-2 text-xs font-medium text-muted-foreground">
-          Phases
+        <div className="my-5 h-px bg-border-hairline" />
+        <h3 className="mb-4 text-xs font-normal text-subtle-foreground">
+          {settled ? "Run activity" : "Current activity"}
         </h3>
-        <div className="-mx-2">
+        <div className="min-w-0">
           <WorkflowProgress
             progress={shared.progress}
             settled={!isRunActive(run)}
             error={run.error}
-            collapsiblePhases
             currentPhaseIndex={shared.currentPhaseIndex}
-            terminalState={runTerminalState(run)}
             onAgentActivate={(agent) =>
               activateWorkflowAgent(agent, shared.callsById, (threadId) =>
                 navigate.toThread(threadId),
@@ -988,43 +906,58 @@ function WorkflowRunPanelLoaded({
             }
           />
         </div>
-        <div className="my-4 h-px bg-border-seam" />
-        <h3 className="mb-2 text-xs font-medium text-muted-foreground">
-          Run details
-        </h3>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
-          <dt className="text-subtle-foreground">Agent calls</dt>
-          <dd className="text-right text-muted-foreground">
-            {completedCalls} of {shared.progress.agents.length}
-          </dd>
-          <dt className="text-subtle-foreground">Cache hits</dt>
-          <dd className="text-right text-muted-foreground">{cachedCalls}</dd>
-          <dt className="text-subtle-foreground">Started</dt>
-          <dd className="text-right text-muted-foreground">
-            {run.startedAt === null
-              ? "—"
-              : new Date(run.startedAt).toLocaleTimeString()}
-          </dd>
-          <dt className="text-subtle-foreground">Result</dt>
-          <dd className="text-right text-muted-foreground">
-            {run.resultAvailable ? "Available" : "—"}
-          </dd>
-        </dl>
-      </div>
-      {isRunActive(run) ? (
-        <div className="border-t border-border-seam p-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full text-destructive-text"
-            disabled={stopping}
-            onClick={() => void stop()}
+        <details className="group mt-6 border-t border-border-hairline pt-4">
+          <summary
+            className={cn(
+              "flex w-fit max-w-full cursor-pointer list-none items-center gap-2 rounded text-xs text-subtle-foreground [&::-webkit-details-marker]:hidden",
+              WORKFLOW_FOCUS_CLASS,
+            )}
           >
-            {stopping ? "Stopping…" : "Stop workflow"}
-          </Button>
-        </div>
-      ) : null}
+            <Icon
+              name="ChevronRight"
+              className="size-3 shrink-0 group-open:rotate-90"
+              aria-hidden
+            />
+            Run details
+          </summary>
+          <dl className="mt-4 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-xs">
+            {[
+              ["Run ID", run.id],
+              [
+                "Completed calls",
+                `${completedCalls} of ${shared.progress.agents.length} recorded`,
+              ],
+              ["Cache hits", cachedCalls],
+              ["Created", new Date(run.createdAt).toLocaleString()],
+              [
+                "Started",
+                run.startedAt === null
+                  ? "—"
+                  : new Date(run.startedAt).toLocaleString(),
+              ],
+              [
+                "Finished",
+                run.finishedAt === null
+                  ? "—"
+                  : new Date(run.finishedAt).toLocaleString(),
+              ],
+              ["Result", run.resultAvailable ? "Available" : "Not available"],
+            ].map(([label, value]) => (
+              <div key={label} className="contents">
+                <dt className="text-subtle-foreground">{label}</dt>
+                <dd className="min-w-0 break-words text-right text-muted-foreground [overflow-wrap:anywhere]">
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      </div>
+      <footer className="border-t border-border-hairline px-6 py-3 text-2xs text-subtle-foreground">
+        {settled
+          ? "Run finished · expand a phase to inspect its agents"
+          : "Live status · active work expanded"}
+      </footer>
     </div>
   );
 }
