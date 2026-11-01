@@ -18,7 +18,14 @@ function catalog(
   overrides: Partial<WorkflowCatalogDependencies> = {},
 ): WorkflowCatalogDependencies {
   return {
-    listProviders: async () => [{ id: "codex", available: true }],
+    listProviders: async () => [
+      {
+        id: "codex",
+        available: true,
+        capabilities: { permissionModes: ["full"] },
+      },
+    ],
+    originPermissionMode: async () => "full",
     loadModels: async () => ({
       modelLoadError: null,
       selectedOnlyModels: [],
@@ -72,6 +79,49 @@ describe("workflow validation", () => {
           { title: "Verify", detail: null },
         ],
       },
+    });
+  });
+
+  describe("permission modes", () => {
+    const withMode = (mode: string) =>
+      SOURCE.replace(
+        `reasoningLevel: "medium",`,
+        `reasoningLevel: "medium",\n  permissionMode: "${mode}",`,
+      );
+    const autoOrigin = catalog({ originPermissionMode: async () => "auto" });
+
+    it("rejects an inherited mode the provider lacks and names the fix", async () => {
+      await expect(
+        validateWorkflowSource(SOURCE, "env-1", autoOrigin),
+      ).rejects.toThrow(
+        'inherited permission mode "auto"; set permissionMode on this agent call to one of full',
+      );
+    });
+
+    it("accepts a supported explicit mode over the inherited one", async () => {
+      await expect(
+        validateWorkflowSource(withMode("full"), "env-1", autoOrigin),
+      ).resolves.toMatchObject({
+        literalSelections: [{ permissionMode: "full" }],
+      });
+    });
+
+    it("rejects an unsupported explicit mode", async () => {
+      await expect(
+        validateWorkflowSource(withMode("auto"), "env-1", catalog()),
+      ).rejects.toThrow(
+        'Provider codex does not support permission mode "auto"',
+      );
+    });
+
+    it("defers the inherited check when there is no origin thread", async () => {
+      await expect(
+        validateWorkflowSource(
+          SOURCE,
+          "env-1",
+          catalog({ originPermissionMode: async () => null }),
+        ),
+      ).resolves.toMatchObject({ valid: true });
     });
   });
 

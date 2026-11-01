@@ -4,6 +4,7 @@ import type { ParsedWorkflow } from "./types.js";
 interface CatalogProvider {
   id: string;
   available: boolean;
+  capabilities: { permissionModes: string[] };
 }
 
 interface CatalogModel {
@@ -21,6 +22,8 @@ interface ModelCatalog {
 export interface WorkflowCatalogDependencies {
   listProviders(environmentId: string): Promise<CatalogProvider[]>;
   loadModels(environmentId: string, providerId: string): Promise<ModelCatalog>;
+  /** Null when the workflow has no origin thread to inherit from yet. */
+  originPermissionMode(): Promise<string | null>;
 }
 
 export interface WorkflowValidationSummary {
@@ -85,6 +88,20 @@ export async function validateWorkflowSource(
       ) {
         throw new Error(
           `Unsupported reasoning level for literal workflow selection ${tupleDescription(selection)}`,
+        );
+      }
+      const permissionMode =
+        selection.permissionMode ?? (await catalog.originPermissionMode());
+      if (
+        permissionMode !== null &&
+        !provider.capabilities.permissionModes.includes(permissionMode)
+      ) {
+        const source =
+          selection.permissionMode === null
+            ? `inherited permission mode ${JSON.stringify(permissionMode)}; set permissionMode on this agent call to one of ${provider.capabilities.permissionModes.join(", ")}`
+            : `permission mode ${JSON.stringify(permissionMode)}`;
+        throw new Error(
+          `Provider ${provider.id} does not support ${source} for literal workflow selection ${tupleDescription(selection)}${selection.line === null ? "" : ` at line ${selection.line}`}`,
         );
       }
     }

@@ -2,6 +2,7 @@ import Ajv from "ajv";
 import { z } from "zod";
 import { canonicalizeJson } from "./cache.js";
 import type {
+  AgentPermissionMode,
   JsonObject,
   JsonSchema,
   JsonValue,
@@ -13,12 +14,18 @@ export const AGENT_OPTION_KEYS = new Set([
   "provider",
   "model",
   "reasoningLevel",
+  "permissionMode",
   "outputSchema",
   "schema",
   "title",
   "label",
   "phase",
 ]);
+export const AGENT_PERMISSION_MODES: readonly AgentPermissionMode[] = [
+  "accept-edits",
+  "auto",
+  "full",
+];
 const MAX_SCHEMA_BYTES = 64 * 1024;
 const MAX_SCHEMA_DEPTH = 32;
 const MAX_SCHEMA_NODES = 4_096;
@@ -134,6 +141,7 @@ const storedAgentOptionsSchema = z
         provider: z.string().min(1),
         model: z.string().min(1),
         reasoningLevel: z.string().min(1),
+        permissionMode: z.enum(["accept-edits", "auto", "full"]).optional(),
       })
       .strict()
       .nullable(),
@@ -362,6 +370,31 @@ function assertSupportedSchema(schema: JsonSchema, path: string): void {
   }
 }
 
+export function isAgentPermissionMode(
+  value: string,
+): value is AgentPermissionMode {
+  return (AGENT_PERMISSION_MODES as readonly string[]).includes(value);
+}
+
+function parsePermissionMode(
+  options: JsonObject,
+  hasSelection: boolean,
+): AgentPermissionMode | null {
+  const value = optionalNonEmptyString(options, "permissionMode");
+  if (value === null) return null;
+  if (!hasSelection) {
+    throw new Error(
+      "agent options.permissionMode requires provider, model, and reasoningLevel",
+    );
+  }
+  if (!isAgentPermissionMode(value)) {
+    throw new Error(
+      `agent options.permissionMode must be one of ${AGENT_PERMISSION_MODES.join(", ")}`,
+    );
+  }
+  return value;
+}
+
 export function parseAgentOptions(
   value: JsonValue | undefined,
 ): WorkflowAgentOptions {
@@ -391,6 +424,7 @@ export function parseAgentOptions(
       "agent options must provide provider, model, and reasoningLevel together, or omit all three",
     );
   }
+  const permissionMode = parsePermissionMode(value, selectionCount !== 0);
 
   const hasOutputSchema = Object.hasOwn(value, "outputSchema");
   const hasSchema = Object.hasOwn(value, "schema");
@@ -424,7 +458,12 @@ export function parseAgentOptions(
   return {
     selection:
       provider !== null && model !== null && reasoningLevel !== null
-        ? { provider, model, reasoningLevel }
+        ? {
+            provider,
+            model,
+            reasoningLevel,
+            ...(permissionMode === null ? {} : { permissionMode }),
+          }
         : null,
     outputSchema,
     title: title ?? label,

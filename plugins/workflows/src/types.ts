@@ -7,10 +7,14 @@ export type JsonValue =
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonSchema = boolean | JsonObject;
 
+export type AgentPermissionMode = "accept-edits" | "auto" | "full";
+
 interface ExplicitModelSelection {
   provider: string;
   model: string;
   reasoningLevel: string;
+  /** Absent means the worker inherits the origin thread's permission mode. */
+  permissionMode?: AgentPermissionMode;
 }
 
 export interface WorkflowAgentOptions {

@@ -47,6 +47,13 @@ export async function prepareWorkflowSource(
       loadModels(environmentId, providerId) {
         return bb.sdk.providers.models({ environmentId, providerId });
       },
+      async originPermissionMode() {
+        if (!("threadId" in context)) return null;
+        const defaults = await bb.sdk.threads.defaultExecutionOptions({
+          threadId: context.threadId,
+        });
+        return defaults?.permissionMode ?? null;
+      },
     },
   );
   return { ...resolved, validation };

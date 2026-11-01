@@ -150,6 +150,32 @@ describe("workflow agent option validation", () => {
     });
   });
 
+  it("keeps an explicit permission mode with its selection and omits it otherwise", () => {
+    const selection = {
+      provider: "pi",
+      model: "gpt-test",
+      reasoningLevel: "xhigh",
+    };
+    expect(
+      parseAgentOptions({ ...selection, permissionMode: "full" }).selection,
+    ).toEqual({ ...selection, permissionMode: "full" });
+    expect(parseAgentOptions(selection).selection).toEqual(selection);
+    expect(() =>
+      parseAgentOptions({ ...selection, permissionMode: "yolo" }),
+    ).toThrow("permissionMode must be one of accept-edits, auto, full");
+    expect(() => parseAgentOptions({ permissionMode: "full" })).toThrow(
+      "permissionMode requires provider, model, and reasoningLevel",
+    );
+    expect(
+      parseStoredAgentOptions({
+        selection: { ...selection, permissionMode: "full" },
+        outputSchema: null,
+        title: null,
+        phase: null,
+      }).selection,
+    ).toEqual({ ...selection, permissionMode: "full" });
+  });
+
   it("rejects conflicting aliases, partial selections, and invalid display values", () => {
     expect(() => parseAgentOptions({ title: "A", label: "B" })).toThrow(
       "must match",

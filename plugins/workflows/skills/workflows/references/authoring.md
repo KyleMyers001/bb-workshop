@@ -122,6 +122,32 @@ BB validates the tuple against the live provider/model catalog immediately
 before spawning the worker. A provider disappearing between authoring and
 execution fails the call instead of silently substituting another model.
 
+### Permission mode
+
+Workers inherit the origin thread's permission mode. When a provider does not
+support that mode (Pi only supports `full`), set `permissionMode` on the call:
+
+```js
+await agent("Review the change", {
+  provider: "pi",
+  model: "openai-codex/gpt-6.1-sol",
+  reasoningLevel: "xhigh",
+  permissionMode: "full",
+});
+```
+
+`permissionMode` is `accept-edits`, `auto`, or `full`, must be a string literal,
+and requires the provider, model, and reasoning tuple. It applies to that call
+only and can raise the worker above the origin's mode, so use it only when the
+worker needs it and tell the user which calls run on `full`. Check a provider's
+modes with `bb provider list`, under `capabilities.permissionModes`.
+
+`bb workflows validate` and `bb workflows run` reject a literal tuple whose
+explicit or inherited mode the provider lacks. Selections they cannot see, such
+as options built at runtime, fail when the call starts. That rejection creates
+no call record, and `parallel()` reduces it to `null`, so catch the error in the
+thunk when the reason matters.
+
 ## Structured agent results
 
 Set native `schema` (or the compatible `outputSchema` alias) on an individual

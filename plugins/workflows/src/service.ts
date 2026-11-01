@@ -774,11 +774,11 @@ export function createWorkflowService(
       );
     }
     const permissionMode = executionValuesSchema.shape.permissionMode.parse(
-      run.originPermissionMode,
+      options.selection?.permissionMode ?? run.originPermissionMode,
     );
     if (!provider.capabilities.permissionModes.includes(permissionMode)) {
       throw new Error(
-        `Permission mode ${JSON.stringify(run.originPermissionMode)} is not supported by provider ${requested.provider}`,
+        `Permission mode ${JSON.stringify(permissionMode)} is not supported by provider ${requested.provider}`,
       );
     }
     return selectedExecutionSchema.parse({

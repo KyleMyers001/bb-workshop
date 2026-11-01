@@ -1058,6 +1058,33 @@ describe("workflow service policy integration", () => {
     await spawnWorker;
   });
 
+  it("rejects an explicit permission mode the provider does not support", async () => {
+    const test = setup();
+    harnesses.push(test.harness);
+    const run = await test.start(
+      source(`
+        return await agent("bad", {
+          provider: "codex",
+          model: "gpt-test",
+          reasoningLevel: "medium",
+          permissionMode: "auto",
+        }).catch((error) => error.message);
+      `),
+    );
+    const controller = new AbortController();
+    const worker = test.service.runWorker(controller.signal);
+    await eventually(() =>
+      expect(getRunRequired(test.db, run.id).status).toBe("succeeded"),
+    );
+    expect(getRunRequired(test.db, run.id).resultJson).toContain(
+      'Permission mode \\"auto\\" is not supported by provider codex',
+    );
+    expect(test.childCount()).toBe(0);
+    expect(getCall(test.db, run.id, 0)).toBeNull();
+    controller.abort();
+    await worker;
+  });
+
   it("lets later parallel siblings execute live after an identity failure", async () => {
     const test = setup();
     harnesses.push(test.harness);

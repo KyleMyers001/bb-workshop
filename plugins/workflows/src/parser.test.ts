@@ -88,6 +88,34 @@ describe("workflow parser", () => {
     ).toThrow("exceeds");
   });
 
+  it("reports a literal permission mode and rejects unverifiable ones", () => {
+    const tuple = `provider: "pi", model: "gpt-test", reasoningLevel: "xhigh"`;
+    expect(
+      inspectWorkflowSource(
+        `${META}\nreturn agent("x", { ${tuple}, permissionMode: "full" });`,
+      ).literalSelections,
+    ).toMatchObject([{ provider: "pi", permissionMode: "full" }]);
+    expect(
+      inspectWorkflowSource(`${META}\nreturn agent("x", { ${tuple} });`)
+        .literalSelections,
+    ).toMatchObject([{ provider: "pi", permissionMode: null }]);
+    expect(() =>
+      parseWorkflowSource(
+        `${META}\nreturn agent("x", { ${tuple}, permissionMode: args.mode });`,
+      ),
+    ).toThrow("permissionMode must be a string literal");
+    expect(() =>
+      parseWorkflowSource(
+        `${META}\nreturn agent("x", { ${tuple}, permissionMode: "yolo" });`,
+      ),
+    ).toThrow("permissionMode must be a string literal");
+    expect(() =>
+      parseWorkflowSource(
+        `${META}\nreturn agent("x", { permissionMode: "full" });`,
+      ),
+    ).toThrow("permissionMode requires provider, model, and reasoningLevel");
+  });
+
   it("enforces all-or-none model selection in literal agent options", () => {
     expect(() =>
       parseWorkflowSource(`${META}\nreturn agent("x", { provider: "codex" });`),

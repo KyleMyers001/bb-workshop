@@ -8,8 +8,10 @@ import { ancestor } from "acorn-walk";
 import type { JsonObject, JsonValue, ParsedWorkflow } from "./types.js";
 import {
   AGENT_OPTION_KEYS,
+  AGENT_PERMISSION_MODES,
   assertValidJsonSchema,
   assertValidWorkflowSourceText,
+  isAgentPermissionMode,
 } from "./validation.js";
 import { canonicalizeJson } from "./cache.js";
 
@@ -17,6 +19,7 @@ export interface LiteralAgentSelection {
   provider: string;
   model: string;
   reasoningLevel: string;
+  permissionMode: string | null;
   line: number | null;
 }
 
@@ -151,6 +154,25 @@ function inspectAgentOptions(
       "agent options must provide provider, model, and reasoningLevel together, or omit all three",
     );
   }
+  const permissionModeExpression = properties.get("permissionMode");
+  let permissionMode: string | null = null;
+  if (permissionModeExpression !== undefined) {
+    if (presentCount === 0) {
+      throw new Error(
+        "agent options.permissionMode requires provider, model, and reasoningLevel",
+      );
+    }
+    if (
+      permissionModeExpression.type !== "Literal" ||
+      typeof permissionModeExpression.value !== "string" ||
+      !isAgentPermissionMode(permissionModeExpression.value)
+    ) {
+      throw new Error(
+        `agent options.permissionMode must be a string literal, one of ${AGENT_PERMISSION_MODES.join(", ")}`,
+      );
+    }
+    permissionMode = permissionModeExpression.value;
+  }
   if (presentCount === selectionKeys.length) {
     const values = selectionKeys.map((key) => {
       const expression = properties.get(key)!;
@@ -169,6 +191,7 @@ function inspectAgentOptions(
       provider: values[0]!,
       model: values[1]!,
       reasoningLevel: values[2]!,
+      permissionMode,
       line: node.loc?.start.line ?? null,
     });
   }

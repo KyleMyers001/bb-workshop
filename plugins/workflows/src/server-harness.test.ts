@@ -781,6 +781,7 @@ describe("workflow resume cache integration", () => {
 
   function setup() {
     let childCount = 0;
+    const spawnedPermissionModes: Array<string | undefined> = [];
     const execution = {
       model: "model-a",
       reasoningLevel: "medium" as "medium" | "high",
@@ -804,8 +805,9 @@ describe("workflow resume cache integration", () => {
             serviceTier: "default",
             source: "default",
           }),
-          spawn: async () => {
+          spawn: async (args) => {
             childCount += 1;
+            spawnedPermissionModes.push(args.permissionMode);
             return { id: `cache-child-${childCount}` } as never;
           },
           send: async () => ({ ok: true }),
@@ -867,12 +869,45 @@ describe("workflow resume cache integration", () => {
       start,
       finish,
       childCount: () => childCount,
+      spawnedPermissionModes,
       setCatalog(models: string[], selectedOnly: string[]) {
         activeModels = models.map(availableModel);
         selectedOnlyModels = selectedOnly.map(availableModel);
       },
     };
   }
+
+  it("spawns with an explicit permission mode and keys the cache on it", async () => {
+    const test = setup();
+    const controller = new AbortController();
+    const worker = test.service.runWorker(controller.signal);
+    const tuple = `provider: "codex", model: "model-a", reasoningLevel: "medium"`;
+    const run = await test.start(
+      workflowSource(`return await Promise.all([
+        agent("explicit", { ${tuple}, permissionMode: "full" }),
+        agent("inherited", { ${tuple} }),
+      ]);`),
+      null,
+    );
+    await eventually(() => expect(test.childCount()).toBe(2));
+    expect(test.spawnedPermissionModes).toEqual(["full", "accept-edits"]);
+    expect(getCall(test.db, run.id, 0)).toMatchObject({
+      resolvedPermissionMode: "full",
+    });
+    expect(getCall(test.db, run.id, 1)).toMatchObject({
+      resolvedPermissionMode: "accept-edits",
+    });
+    expect(getCall(test.db, run.id, 0)?.cacheKey).not.toBe(
+      getCall(test.db, run.id, 1)?.cacheKey,
+    );
+    await test.finish("cache-child-1", "a");
+    await test.finish("cache-child-2", "b");
+    await eventually(() =>
+      expect(getRunRequired(test.db, run.id).status).toBe("succeeded"),
+    );
+    controller.abort();
+    await worker;
+  });
 
   it("retries a transient provider failure before settling the call", async () => {
     const test = setup();
