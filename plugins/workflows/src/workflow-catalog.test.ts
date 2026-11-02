@@ -47,8 +47,46 @@ describe("workflow catalog", () => {
     } finally { await harness.dispose(); }
   });
 
+  it.each([404, 502])("treats local directory ENOENT with HTTP %s as an absent override", async (status) => {
+    const { bb, harness } = await fixture({ "/shared/loop.js": source });
+    harness.sdk.stub("hosts.directory", async ({ path }) => {
+      if (path === "/repo/.bb/workflows") {
+        throw Object.assign(new Error("local directory missing"), { status, code: "ENOENT" });
+      }
+      return {
+        directory: path, parent: null, roots: [],
+        entries: [{ kind: "file", name: "loop.js", path: "/shared/loop.js" }],
+      };
+    });
+    try {
+      const result = await catalogWorkflows(bb, { projectId: "project-test", threadId: "thread-test" }, "/shared");
+      expect(result.scanIncomplete).toBe(false);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.entries).toHaveLength(1);
+      expect(result.entries[0]).toMatchObject({ lookupName: "loop", scope: "shared", selected: true });
+    } finally { await harness.dispose(); }
+  });
+
+  it.each([
+    Object.assign(new Error("permission denied"), { status: 502, code: "EACCES" }),
+    Object.assign(new Error("host offline"), { status: 502, code: "host_unavailable" }),
+    Object.assign(new Error("confinement failure"), { status: 502, code: "invalid_path" }),
+    new Error("ENOENT in text is not structured absence"),
+  ])("retains non-missing local directory diagnostics: %s", async (error) => {
+    const { bb, harness } = await fixture({});
+    harness.sdk.stub("hosts.directory", async () => { throw error; });
+    try {
+      const result = await catalogWorkflows(bb, { projectId: "project-test", threadId: "thread-test" });
+      expect(result.scanIncomplete).toBe(true);
+      expect(result.diagnostics).toHaveLength(1);
+      expect(result.diagnostics[0]).toContain("local directory /repo/.bb/workflows");
+      expect(result.diagnostics[0]).toContain(error.message);
+    } finally { await harness.dispose(); }
+  });
+
   it.each([
     Object.assign(new Error("missing shared root"), { status: 404, code: "ENOENT" }),
+    Object.assign(new Error("missing shared root"), { status: 502, code: "ENOENT" }),
     Object.assign(new Error("not a directory"), { status: 400, code: "invalid_path" }),
     Object.assign(new Error("origin host offline"), { status: 503, code: "host_offline" }),
   ])("reports unavailable roots rather than claiming an exhaustive empty library: %s", async (error) => {
@@ -58,6 +96,7 @@ describe("workflow catalog", () => {
       const result = await catalogWorkflows(bb, { projectId: "project-test", threadId: "thread-test" }, "/shared");
       expect(result.scanIncomplete).toBe(true);
       expect(result.diagnostics.join(" ")).toContain(error.message);
+      expect(result.diagnostics.join(" ")).toContain("shared directory /shared");
       expect(result.diagnostics.join(" ")).toContain("host-origin");
     } finally { await harness.dispose(); }
   });

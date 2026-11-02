@@ -82,7 +82,12 @@ export async function catalogWorkflows(
         names.add(entry.name.slice(0, -3));
       }
     } catch (error) {
-      if (scope === "local" && isMissingWorkflowFile(error)) return;
+      // hosts.directory preserves daemon ENOENT as HTTP 502; unlike files.read,
+      // it does not remap missing paths to 404. Only local absence is benign.
+      if (
+        scope === "local" && typeof error === "object" && error !== null &&
+        "code" in error && error.code === "ENOENT"
+      ) return;
       scanIncomplete = true;
       diagnostics.push(`${scope} directory ${root} on host ${environment.hostId}: ${diagnostic(error)}`);
     }
