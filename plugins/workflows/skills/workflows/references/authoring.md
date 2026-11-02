@@ -1,5 +1,15 @@
 # Workflow source and agent API
 
+## Discover before authoring
+
+Use `bb workflows catalog` / `bb_workflow_catalog` first. Inspect a matching
+lookup name's metadata, `inputSchema`, source path, and diagnostics; read its
+source on the reported host and validate with `--name` before an authorized run.
+A lookup name comes from the filename, not `meta.name`. Reuse suitable source by
+name rather than copying it or moving the execution workspace. If a requested
+workflow is missing or unsuitable, report that instead of silently replacing it.
+See references/runs.md (relative to the skill directory) for sharing and limits.
+
 ## Source format
 
 Every script must begin with `export const meta = {...}`:
@@ -79,7 +89,12 @@ and per-agent result schemas; rejection errors identify the unsafe schema path.
   concurrency cap, agent counter, abort signal, replay order, and progress. The
   `args` parameter becomes the child's `args` global. Nesting is one level only:
   `workflow()` inside a child throws. Unknown names, unreadable paths, and child
-  syntax errors throw; catch them to handle gracefully.
+  syntax errors throw; catch them to handle gracefully. Names use the same
+  repo-local-first/shared-fallback policy as CLI and tool calls, on the parent's
+  persisted origin environment/host. A child inherits execution defaults from
+  the parent, never from the directory containing its source. Explicit child
+  `scriptPath` stays confined to the requesting workspace. Discovery setting
+  changes affect later child loads; already captured source is unchanged.
 
 Workers are told their final text IS the return value (not a human-facing
 message), so they return raw data. For structured output, use the `schema`

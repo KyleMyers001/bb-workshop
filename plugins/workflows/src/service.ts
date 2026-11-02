@@ -60,6 +60,7 @@ import {
   DEFAULT_WORKFLOW_SETTINGS,
   parseStoredWorkflowSettings,
   type WorkflowSettings,
+  type GetWorkflowDiscoverySettings,
 } from "./settings.js";
 import { workflowReferenceToSourceInput } from "./source-resolution.js";
 import type {
@@ -392,6 +393,9 @@ export function createWorkflowService(
   bb: BbPluginApi,
   db: Db,
   initialSettings: WorkflowSettings = DEFAULT_WORKFLOW_SETTINGS,
+  getDiscovery: GetWorkflowDiscoverySettings = async () => ({
+    sharedWorkflowDirectory: null,
+  }),
 ): WorkflowService {
   let shuttingDown = false;
   let currentSettings = initialSettings;
@@ -1444,6 +1448,7 @@ export function createWorkflowService(
             bb,
             { projectId: run.projectId, environmentId: run.environmentId },
             workflowReferenceToSourceInput(reference),
+            (await getDiscovery()).sharedWorkflowDirectory,
           );
           throwIfCancelled(context.signal);
           const { workflow: child, literalSelections: childSelections } =

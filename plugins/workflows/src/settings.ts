@@ -4,6 +4,27 @@ import type {
   PluginSettingsValues,
 } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import path from "node:path";
+
+const sharedDirectorySchema = z.string().refine(
+  (value) =>
+    value === "" ||
+    ((path.posix.isAbsolute(value) || path.win32.isAbsolute(value)) &&
+      !value.includes("\0") &&
+      !/[~$%]/.test(value) &&
+      // A rooted Windows path without a drive is not an absolute host location.
+      (value.startsWith("/") ||
+        /^[a-z]:[\\/]/i.test(value) ||
+        value.startsWith("\\\\"))),
+  "Shared workflow directory must be an absolute path without ~ or environment variables",
+);
+
+export interface WorkflowDiscoverySettings {
+  sharedWorkflowDirectory: string | null;
+}
+
+export type GetWorkflowDiscoverySettings =
+  () => Promise<WorkflowDiscoverySettings>;
 
 interface IntegerField {
   label: string;
@@ -67,6 +88,13 @@ const workflowSettingsSchema = z.object({
 export type WorkflowSettings = z.infer<typeof workflowSettingsSchema>;
 
 export const WORKFLOW_SETTING_DESCRIPTORS = {
+  sharedWorkflowDirectory: {
+    type: "string",
+    label: "Shared workflow directory",
+    description:
+      "Optional absolute directory on the requesting environment's host. Names resolve locally first. No ~ or variable expansion.",
+    experimental_schema: sharedDirectorySchema,
+  },
   maxActiveRuns: {
     type: "number",
     label: "Maximum active runs",
@@ -128,7 +156,7 @@ export const DEFAULT_WORKFLOW_SETTINGS: Readonly<WorkflowSettings> =
   });
 
 export function validateWorkflowSettings(
-  values: Readonly<DeclaredWorkflowSettings>,
+  values: Readonly<Omit<DeclaredWorkflowSettings, "sharedWorkflowDirectory">>,
 ): WorkflowSettings {
   return Object.freeze(workflowSettingsSchema.parse(values));
 }
@@ -166,6 +194,7 @@ export function parseStoredWorkflowSettings(value: unknown): WorkflowSettings {
 
 interface WorkflowSettingsHandle {
   get(): Promise<WorkflowSettings>;
+  getDiscovery: GetWorkflowDiscoverySettings;
   onChange(
     listener: (next: WorkflowSettings, previous: WorkflowSettings) => void,
     onInvalid?: (error: Error) => void,
@@ -178,6 +207,15 @@ export function registerWorkflowSettings(
   const handle = bb.settings.define(WORKFLOW_SETTING_DESCRIPTORS);
   let lastValid = DEFAULT_WORKFLOW_SETTINGS;
   return {
+    async getDiscovery() {
+      const value = (await handle.get()).sharedWorkflowDirectory;
+      return {
+        sharedWorkflowDirectory:
+          value === undefined || value === ""
+            ? null
+            : sharedDirectorySchema.parse(value),
+      };
+    },
     async get() {
       const validated = validateWorkflowSettings(await handle.get());
       lastValid = validated;

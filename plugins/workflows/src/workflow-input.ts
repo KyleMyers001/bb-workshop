@@ -4,6 +4,7 @@ import {
   type ResolvedWorkflowSource,
   type WorkflowSourceContext,
   type WorkflowSourceInput,
+  type WorkflowSourceResolverDependencies,
 } from "./source-resolution.js";
 import {
   validateWorkflowSource,
@@ -14,12 +15,12 @@ interface PreparedWorkflowSource extends ResolvedWorkflowSource {
   validation: WorkflowValidationSummary;
 }
 
-export async function prepareWorkflowSource(
+export function workflowSourceDependencies(
   bb: BbPluginApi,
-  context: WorkflowSourceContext,
-  input: WorkflowSourceInput,
-): Promise<PreparedWorkflowSource> {
-  const resolved = await resolveWorkflowSource(input, context, {
+  sharedWorkflowDirectory: string | null = null,
+): WorkflowSourceResolverDependencies {
+  return {
+    sharedWorkflowDirectory,
     async getThreadEnvironmentId(threadId) {
       const thread = await bb.sdk.threads.get({ threadId });
       return thread.environmentId;
@@ -36,7 +37,17 @@ export async function prepareWorkflowSource(
     readFile(input) {
       return bb.sdk.files.read(input);
     },
-  });
+  };
+}
+
+export async function prepareWorkflowSource(
+  bb: BbPluginApi,
+  context: WorkflowSourceContext,
+  input: WorkflowSourceInput,
+  sharedWorkflowDirectory: string | null = null,
+): Promise<PreparedWorkflowSource> {
+  const resolved = await resolveWorkflowSource(input, context,
+    workflowSourceDependencies(bb, sharedWorkflowDirectory));
   const validation = await validateWorkflowSource(
     resolved.source,
     resolved.environmentId,
