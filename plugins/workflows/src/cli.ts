@@ -14,9 +14,13 @@ import type {
 } from "./service.js";
 import type { WorkflowRunRow } from "./data.js";
 import type { WorkflowSourceInput } from "./source-resolution.js";
-import { parseStoredWorkflowSettings } from "./settings.js";
+import {
+  parseStoredWorkflowSettings,
+  type GetWorkflowDiscoverySettings,
+} from "./settings.js";
 import { utf8Prefix } from "./utf8.js";
 import { prepareWorkflowSource } from "./workflow-input.js";
+import { catalogWorkflows, CATALOG_LIMITS } from "./workflow-catalog.js";
 
 const STATUS_INLINE_RESULT_MAX_BYTES = 8 * 1024;
 const STATUS_DISPLAY_TEXT_MAX_BYTES = 1_024;
@@ -307,7 +311,7 @@ const SOURCE_OPTIONS = {
     placeholder: "name",
     aliases: ["workflow"],
     description:
-      "Named workflow under .bb/workflows/<name>.js; lowercase kebab-case, at most 64 characters",
+      "Named workflow: repo-local .bb/workflows/<name>.js first, then configured shared directory; lowercase kebab-case, at most 64 characters. Discover with catalog.",
   },
 } as const;
 const SOURCE_CONSTRAINT = {
@@ -318,6 +322,9 @@ const SOURCE_CONSTRAINT = {
 export function registerWorkflowCli(
   bb: BbPluginApi,
   service: WorkflowService,
+  getDiscovery: GetWorkflowDiscoverySettings = async () => ({
+    sharedWorkflowDirectory: null,
+  }),
 ): void {
   bb.cli.register(
     defineCli({
@@ -326,6 +333,34 @@ export function registerWorkflowCli(
       description:
         "Workflows run in the background: start one, then poll the compact status summary and read bounded JSONL history pages.",
       commands: {
+        catalog: cliCommand({
+          summary:
+            "Discover local and shared workflows, arguments, shadowing and diagnostics (no execution)",
+          options: {
+            name: {
+              type: "string",
+              description:
+                "Inspect one kebab-case lookup name (not meta.name), including known symlinks",
+            },
+            limit: {
+              type: "integer",
+              min: 1,
+              max: CATALOG_LIMITS.maxEntries,
+              default: CATALOG_LIMITS.defaultEntries,
+              description:
+                "Maximum entries (1-50); output capped at 64 KiB, metadata at 8 KiB. Reports incomplete scans and omissions.",
+            },
+            json: { type: "boolean", description: JSON_OPTION_DESCRIPTION },
+          },
+          run(input, ctx) {
+            return guarded(async () => success(await catalogWorkflows(
+              bb,
+              requireContext(ctx),
+              (await getDiscovery()).sharedWorkflowDirectory,
+              input.options,
+            )));
+          },
+        }),
         run: cliCommand({
           summary: "Start a workflow and return immediately",
           constraints: [SOURCE_CONSTRAINT],
@@ -352,6 +387,7 @@ export function registerWorkflowCli(
                 bb,
                 context,
                 sourceInput(input.options, ctx.cwd),
+                (await getDiscovery()).sharedWorkflowDirectory,
               );
               const run = await service.start({
                 projectId: context.projectId,
@@ -382,6 +418,7 @@ export function registerWorkflowCli(
                 bb,
                 context,
                 sourceInput(input.options, ctx.cwd),
+                (await getDiscovery()).sharedWorkflowDirectory,
               );
               return success({
                 ...prepared.validation,

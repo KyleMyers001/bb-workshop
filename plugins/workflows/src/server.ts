@@ -12,6 +12,8 @@ import type { JsonValue } from "./types.js";
 import { prepareWorkflowSource } from "./workflow-input.js";
 import { workflowUiRpcContract } from "./ui-contract.js";
 import { buildWorkflowRunView } from "./ui-view.js";
+import { catalogWorkflows, CATALOG_LIMITS } from "./workflow-catalog.js";
+import { utf8Prefix } from "./utf8.js";
 
 const sourceInputFields = {
   script: z
@@ -37,7 +39,7 @@ const sourceInputFields = {
     .string()
     .min(1)
     .describe(
-      "Name of a saved workflow from the current workspace's .bb/workflows/ directory. Resolves to a self-contained script.",
+      "Workflow lookup name: current workspace's .bb/workflows/ first, then configured shared directory on the origin host. Discover metadata and arguments with bb_workflow_catalog before running.",
     )
     .optional(),
 } as const;
@@ -89,7 +91,9 @@ export default async function plugin(bb: BbPluginApi) {
       `Workflow settings are invalid; defaults are active until the settings are corrected: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  const service = createWorkflowService(bb, db, initialSettings);
+  const service = createWorkflowService(
+    bb, db, initialSettings, settings.getDiscovery,
+  );
   settings.onChange(
     (next) => service.updateSettings(next),
     (error) =>
@@ -97,7 +101,7 @@ export default async function plugin(bb: BbPluginApi) {
         `Workflow settings are invalid; the last valid values remain active: ${error.message}`,
       ),
   );
-  registerWorkflowCli(bb, service);
+  registerWorkflowCli(bb, service, settings.getDiscovery);
 
   function workflowForThread(threadId: string, runId: string | null) {
     const run =
@@ -144,7 +148,10 @@ export default async function plugin(bb: BbPluginApi) {
     parameters: runInputSchema,
     async execute(input, ctx) {
       try {
-        const prepared = await prepareWorkflowSource(bb, ctx, input);
+        const prepared = await prepareWorkflowSource(
+          bb, ctx, input,
+          (await settings.getDiscovery()).sharedWorkflowDirectory,
+        );
         const run = await service.start({
           projectId: ctx.projectId,
           originThreadId: ctx.threadId,
@@ -163,6 +170,31 @@ export default async function plugin(bb: BbPluginApi) {
         return errorResult(
           error instanceof Error ? error.message : String(error),
         );
+      }
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "bb_workflow_catalog",
+    description:
+      "Discover existing repo-local and configured shared workflows before authoring or running one. Parses metadata and inputSchema without execution or model-provider access. Returns lookup names, source paths, provenance, local shadowing, diagnostics and explicit scan/output limits (64 KiB output, 8 KiB metadata). Discovery does not authorize orchestration.",
+    parameters: z.object({
+      name: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/).optional()
+        .describe("Inspect one filename lookup name (not meta.name), including known symlinks"),
+      limit: z.number().int().min(1).max(CATALOG_LIMITS.maxEntries)
+        .default(CATALOG_LIMITS.defaultEntries)
+        .describe("Maximum returned entries, 1-50; truncation is explicit"),
+    }).strict(),
+    async execute(input, ctx) {
+      try {
+        // Compact JSON preserves the catalog's byte budget across both surfaces.
+        return JSON.stringify(await catalogWorkflows(
+          bb, ctx, (await settings.getDiscovery()).sharedWorkflowDirectory, input,
+        ));
+      } catch (error) {
+        return errorResult(utf8Prefix(
+          error instanceof Error ? error.message : String(error), 1_024,
+        ));
       }
     },
   });
@@ -223,7 +255,7 @@ export default async function plugin(bb: BbPluginApi) {
       };
     }
     return {
-      tools: ["bb_workflow_run"],
+      tools: ["bb_workflow_run", "bb_workflow_catalog"],
       skills: ["workflows"],
       instructions:
         "When bb_workflow_run succeeds, copy its previewDirective into your response exactly once as a standalone line. Do not wrap it in backticks or a code fence, and do not invent or edit the run ID. The directive renders live workflow progress in BB chat. `bb workflows status <run-id>` returns a compact summary. For detailed history, redirect `bb workflows history <run-id> --cursor <call-index> --limit <1-100>` into a file under `$BB_THREAD_STORAGE`, then inspect that JSONL file with normal filesystem tools. Use each page record's `nextCursor` to continue.",

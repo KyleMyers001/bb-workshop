@@ -10,6 +10,7 @@ import {
   migrations,
 } from "./data.js";
 import plugin from "./server.js";
+import { discoveryHost, discoverySource } from "./discovery.test-support.js";
 import { createWorkflowService } from "./service.js";
 
 async function eventually(
@@ -280,6 +281,7 @@ describe("workflows plugin", () => {
       );
       expect(authorConfig.tools.map((tool) => tool.name)).toEqual([
         "bb_workflow_run",
+        "bb_workflow_catalog",
       ]);
       expect(authorConfig.skills).toEqual(["workflows"]);
       expect(authorConfig.instructions).toContain(
@@ -1516,5 +1518,95 @@ describe("workflow resume cache integration", () => {
 
     secondController.abort();
     await secondWorker;
+  });
+});
+
+describe("shared discovery public contracts", () => {
+  const context = { projectId: "project-test", threadId: "thread-test" };
+
+  it.each(["validate", "run", "tool"])("uses the same precedence and failures through %s", async (surface) => {
+    const { harness, files } = await discoveryHost();
+    const invoke = async () => surface === "tool"
+      ? harness.callAgentTool("bb_workflow_run", { name: "loop" }, context)
+      : harness.runCli([surface, "--name", "loop"], context);
+    const succeeds = async () => {
+      const result = await invoke();
+      if (surface === "tool") {
+        expect(typeof result).toBe("string");
+        return JSON.parse(result as string);
+      }
+      expect(result).toMatchObject({ exitCode: 0 });
+      return JSON.parse((result as { stdout: string }).stdout);
+    };
+    try {
+      files.set("/shared/loop.js", discoverySource("shared"));
+      const sharedResult = await succeeds();
+      expect(sharedResult).toMatchObject(surface === "validate"
+        ? { origin: { scope: "shared", path: "/shared/loop.js" } } : { name: "meta-shared" });
+      files.set("/request/.bb/workflows/loop.js", discoverySource("local"));
+      expect(await succeeds()).toMatchObject(surface === "validate"
+        ? { origin: { scope: "local" } } : { name: "meta-local" });
+      for (const bad of ["invalid local", Object.assign(new Error("permission denied"), { status: 500, code: "EACCES" }), Object.assign(new Error("host offline"), { status: 503, code: "host_offline" })]) {
+        files.set("/request/.bb/workflows/loop.js", bad);
+        const reads = harness.sdk.callsTo("files.read").length;
+        const result = await invoke();
+        expect(result).toMatchObject(surface === "tool" ? { isError: true } : { exitCode: 1 });
+        expect(harness.sdk.callsTo("files.read").length - reads).toBe(1);
+      }
+      files.delete("/request/.bb/workflows/loop.js");
+      await harness.setSettings({ sharedWorkflowDirectory: "/changed" });
+      files.set("/changed/loop.js", discoverySource("changed"));
+      expect(await succeeds()).toMatchObject(surface === "validate" ? { origin: { path: "/changed/loop.js" } } : { name: "meta-changed" });
+      if (surface !== "validate") {
+        const listed = await harness.runCli(["list"], context);
+        expect(JSON.parse(listed.stdout)).toHaveLength(3);
+        const status = await workflowStatus(harness, sharedResult.runId);
+        expect(status).toMatchObject({ environmentId: "env-request", projectId: "project-test", originProvider: "codex", originModel: "model-test", originPermissionMode: "full" });
+        expect(status.settings).not.toHaveProperty("sharedWorkflowDirectory");
+        const history = await harness.runCli(["history", sharedResult.runId], context);
+        expect(history.exitCode).toBe(0);
+        expect(JSON.parse(history.stdout.split("\n")[0]!).source).toBe(discoverySource("shared"));
+      }
+    } finally { await harness.dispose(); }
+  });
+
+  it("shares the catalog across CLI/tool and advertises it only to authors", async () => {
+    const { harness, files } = await discoveryHost();
+    try {
+      files.set("/shared/loop.js", discoverySource("shared"));
+      const cli = await harness.runCli(["catalog", "--name", "loop"], context);
+      expect(cli.exitCode).toBe(0);
+      const tool = await harness.callAgentTool("bb_workflow_catalog", { name: "loop" }, context);
+      expect(JSON.parse(tool as string)).toEqual(JSON.parse(cli.stdout));
+      expect(harness.sdk.callsTo("providers.list")).toHaveLength(0);
+      expect(harness.sdk.callsTo("threads.spawn")).toHaveLength(0);
+      const author = await harness.resolveAgentConfiguration(makePluginAgentConfigurationContext());
+      expect(author.tools.map((tool) => tool.name)).toContain("bb_workflow_catalog");
+      const worker = await harness.resolveAgentConfiguration(makePluginAgentConfigurationContext({ origin: { pluginId: "workflows" } }));
+      expect(worker.tools.map((tool) => tool.name)).not.toContain("bb_workflow_catalog");
+    } finally { await harness.dispose(); }
+  });
+
+  it("loads nested shared names through the real service without changing execution defaults", async () => {
+    const { harness, files } = await discoveryHost();
+    let worker: ReturnType<typeof harness.runService> | undefined;
+    try {
+      files.set("/shared/child.js", `export const meta = { name: "nested", description: "Nested fixture", phases: [] }; return await agent("inherited worker");`);
+      const started = JSON.parse(await harness.callAgentTool("bb_workflow_run", { script: `export const meta = { name: "parent", description: "Parent fixture", phases: [] }; return [await workflow("child", args), await workflow("second", args)];`, args: { task: "test" } }, context) as string);
+      worker = harness.runService("workflow-worker");
+      await eventually(() => expect(harness.sdk.callsTo("threads.spawn")).toHaveLength(1));
+      expect(harness.sdk.callsTo("threads.spawn")[0]?.[0]).toMatchObject({ projectId: "project-test", environment: { type: "reuse", environmentId: "env-request" }, providerId: "codex", model: "model-test", permissionMode: "full" });
+      files.set("/changed/second.js", discoverySource("changed-child"));
+      await harness.setSettings({ sharedWorkflowDirectory: "/changed" });
+      await harness.emitThreadEvent("thread.idle", { thread: { id: "worker-test" } as never, lastAssistantText: "nested-result" });
+      await eventually(async () => expect(await workflowStatus(harness, started.runId)).toMatchObject({ status: "succeeded", result: ["nested-result", "changed-child"] }));
+      await harness.setSettings({ sharedWorkflowDirectory: null });
+      const resumed = await harness.runCli(["run", "--script", discoverySource("resume"), "--resume", started.runId], context);
+      expect(resumed.exitCode).toBe(0);
+    } finally {
+      worker?.controller.abort();
+      await worker?.done;
+      await harness.dispose();
+    }
   });
 });

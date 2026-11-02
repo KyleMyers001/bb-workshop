@@ -22,6 +22,26 @@ function rawSettings(overrides: Partial<WorkflowSettings> = {}) {
 }
 
 describe("workflow settings policy", () => {
+  it("keeps discovery opt-in, validates paths, and excludes it from run snapshots", async () => {
+    const { bb, harness } = createFakePluginHost({ pluginId: "workflows" });
+    try {
+      const settings = registerWorkflowSettings(bb);
+      await expect(settings.getDiscovery()).resolves.toEqual({ sharedWorkflowDirectory: null });
+      for (const directory of ["/library/workflows", "C:\\library\\workflows", "\\\\server\\share\\flows"]) {
+        await harness.setSettings({ sharedWorkflowDirectory: directory });
+        await expect(settings.getDiscovery()).resolves.toEqual({ sharedWorkflowDirectory: directory });
+        await expect(settings.get()).resolves.toEqual(DEFAULT_WORKFLOW_SETTINGS);
+      }
+      for (const directory of ["relative", "~/flows", "$HOME/flows", "C:flows", "/flows/$NAME", "/flows/%NAME%", "/flows/\0bad"]) {
+        await expect(harness.setSettings({ sharedWorkflowDirectory: directory })).rejects.toThrow();
+      }
+      await harness.setSettings({ sharedWorkflowDirectory: "" });
+      await expect(settings.getDiscovery()).resolves.toEqual({ sharedWorkflowDirectory: null });
+      await harness.setSettings({ sharedWorkflowDirectory: null });
+      await expect(settings.getDiscovery()).resolves.toEqual({ sharedWorkflowDirectory: null });
+      expect(parseStoredWorkflowSettings(await settings.get())).toEqual(DEFAULT_WORKFLOW_SETTINGS);
+    } finally { await harness.dispose(); }
+  });
   it("keeps descriptor defaults and immutable internal defaults aligned", () => {
     const descriptorDefaults = {
       maxActiveRuns: WORKFLOW_SETTING_DESCRIPTORS.maxActiveRuns.default,

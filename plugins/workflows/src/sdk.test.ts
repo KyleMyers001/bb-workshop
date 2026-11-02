@@ -32,7 +32,7 @@ it("keeps the familiar author and worker tools under the fork's plugin ID", asyn
     const author = await harness.behavior.resolveAgentConfiguration(
       makePluginAgentConfigurationContext(),
     );
-    expect(author.tools.map(tool => tool.name)).toEqual(["bb_workflow_run"]);
+    expect(author.tools.map(tool => tool.name)).toEqual(["bb_workflow_run", "bb_workflow_catalog"]);
     expect(author.skills).toEqual(["workflows"]);
     const worker = await harness.behavior.resolveAgentConfiguration(
       makePluginAgentConfigurationContext({ origin: { pluginId: bb.pluginId } }),

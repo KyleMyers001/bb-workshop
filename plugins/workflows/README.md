@@ -4,8 +4,9 @@ An editable, independently maintained copy of BB's Workflows plugin, installed
 from this permanent checkout. No orchestration behavior has been redesigned.
 
 - **Plugin ID:** `workshop-workflows` (`workflows` is reserved by BB).
-- **Commands:** `bb workflows validate|run|status|history|list|stop`.
-- **Tools:** `bb_workflow_run` for authors; `bb_workflow_result` for workers.
+- **Commands:** `bb workflows catalog|validate|run|status|history|list|stop`.
+- **Tools:** `bb_workflow_catalog` and `bb_workflow_run` for authors;
+  `bb_workflow_result` for workers.
 - **Skill:** `workflows`, with authoring and inspection references under `skills/`.
 - **SDK:** pinned to 0.6.104; original engine ranges retained.
 
@@ -103,8 +104,56 @@ use `bb plugin remove`, edit BB's runtime database, or bypass reserved-ID checks
 Workflow JavaScript runs inside QuickJS without filesystem, shell, network,
 imports, clock, or randomness. Worker threads retain normal tools and
 permissions; starting them still requires explicit user authorization for
-orchestration. Source comes from inline scripts or project-local files under
-`.bb/workflows/`, resolved on the origin environment's host.
+orchestration. Source comes from inline scripts, workspace-confined explicit
+files, or named scripts resolved on the origin environment's host.
+
+### Shared discovery (opt-in)
+
+`sharedWorkflowDirectory` is an unset-by-default, plugin-global string setting.
+Configure an absolute directory using Settings → Installed plugins or
+`bb plugin config workshop-workflows set sharedWorkflowDirectory /absolute/library`.
+An empty/unset value disables sharing. Relative paths, `~`, and environment
+variable expressions are rejected; no directories are created or scripts copied.
+The path must exist on the **requesting environment's host**; there is no
+server-filesystem fallback, per-host mapping, or cross-host transport.
+
+A name resolves `.bb/workflows/<name>.js` in the requesting workspace first,
+then `<sharedWorkflowDirectory>/<name>.js` only on structured missing-file
+absence. An invalid, unreadable, oversized, non-UTF-8, or escaping local override
+blocks fallback. All content reads retain SDK host routing and root confinement.
+Explicit `--file`/`scriptPath` remains workspace-confined; sharing does not allow
+arbitrary paths. CLI run/validate, `bb_workflow_run`, and nested `workflow(name)`
+share this policy. Source selection never changes execution workspace,
+provider defaults, permissions, or required orchestration authorization.
+
+Discover before writing new source:
+
+```sh
+bb workflows catalog
+bb workflows catalog --name review-fix-loop
+bb workflows validate --name review-fix-loop
+```
+
+`bb_workflow_catalog` exposes the same catalog to author sessions, not workers.
+It parses metadata without evaluating workflow bodies or querying providers.
+Entries show filename lookup names (distinct from `meta.name`), descriptions,
+input schemas, source paths, local/shared provenance, shadowing, and diagnostics.
+Read a matching source on its reported host, validate, then use that lookup name
+for an authorized run. Never silently substitute for an unavailable or unsuitable
+requested workflow. `bb workflows list` remains **run history**.
+
+Catalog limits are explicit: 1000 directory entries per root, 100 lookup names
+inspected, 20 returned entries by default (`--limit 1-50`), 8 KiB metadata per
+candidate, and 64 KiB serialized output. Check `scanIncomplete`,
+`outputTruncated`, `omittedEntries`, `metadataOmitted`, and diagnostics; query
+`--name` when a listing is incomplete. Only top-level kebab-case `.js` files
+are candidates. Host browsing omits dangling symlinks; a known name can be probed
+directly. Missing/unavailable shared roots produce diagnostics rather than an
+apparently exhaustive empty catalog. Broken local overrides still shadow shared.
+
+Discovery setting updates take effect on subsequent loads, including later
+nested calls, not already captured source. Numeric run-setting snapshots,
+history, resume behavior, and existing active runs are not migrated.
 
 Run state, ordered calls, bounded retries, cancellation, retention, and resume
 prefix caching persist in the plugin-owned database. The UI includes live run

@@ -10,7 +10,7 @@ export interface WorkflowSourceInput {
   name?: string;
 }
 
-interface WorkflowSourceEnvironment {
+export interface WorkflowSourceEnvironment {
   id: string;
   projectId: string;
   hostId: string;
@@ -18,6 +18,7 @@ interface WorkflowSourceEnvironment {
 }
 
 export interface WorkflowSourceResolverDependencies {
+  sharedWorkflowDirectory?: string | null;
   getThreadEnvironmentId(threadId: string): Promise<string | null>;
   getEnvironment(environmentId: string): Promise<WorkflowSourceEnvironment>;
   readFile(input: { hostId: string; path: string; rootPath: string }): Promise<{
@@ -37,7 +38,7 @@ export interface ResolvedWorkflowSource {
   origin:
     | { kind: "script" }
     | { kind: "scriptPath"; path: string }
-    | { kind: "name"; name: string; path: string };
+    | { kind: "name"; name: string; path: string; scope: "local" | "shared" };
 }
 
 export function workflowReferenceToSourceInput(
@@ -86,7 +87,9 @@ function parseSourceMode(
   return { kind: "name", name: name! };
 }
 
-function pathFlavor(rootPath: string): typeof path.posix | typeof path.win32 {
+export function pathFlavor(
+  rootPath: string,
+): typeof path.posix | typeof path.win32 {
   return /^[a-zA-Z]:[\\/]/.test(rootPath) || rootPath.startsWith("\\\\")
     ? path.win32
     : path.posix;
@@ -133,7 +136,11 @@ export function resolveConfinedWorkflowPath(
   return candidate;
 }
 
-function workflowNamePath(rootPath: string, name: string): string {
+export function workflowNamePath(
+  rootPath: string,
+  name: string,
+  shared = false,
+): string {
   if (!/^[a-z][a-z0-9-]{0,63}$/.test(name)) {
     throw new Error(
       "Workflow name must be lowercase kebab-case and at most 64 characters",
@@ -142,26 +149,38 @@ function workflowNamePath(rootPath: string, name: string): string {
   const flavor = pathFlavor(rootPath);
   return resolveConfinedWorkflowPath(
     rootPath,
-    flavor.join(".bb", "workflows", `${name}.js`),
+    shared ? `${name}.js` : flavor.join(".bb", "workflows", `${name}.js`),
   );
 }
 
-async function readWorkflowFile(
+// files.read maps only daemon ENOENT to 404. Generic 404s can mean a missing
+// host/environment; permission, transport and confinement errors are not absence.
+export function isMissingWorkflowFile(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null &&
+    "status" in error && error.status === 404 &&
+    "code" in error && error.code === "ENOENT"
+  );
+}
+
+export async function readWorkflowFile(
   dependencies: WorkflowSourceResolverDependencies,
   environment: WorkflowSourceEnvironment,
   absolutePath: string,
+  rootPath = environment.path!,
 ): Promise<string> {
   let file;
   try {
     file = await dependencies.readFile({
       hostId: environment.hostId,
       path: absolutePath,
-      rootPath: environment.path!,
+      rootPath,
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `Failed to read workflow source ${absolutePath}: ${detail}`,
+      `Failed to read workflow source ${absolutePath} on host ${environment.hostId}: ${detail}`,
+      { cause: error },
     );
   }
   if (file.contentEncoding !== "utf8") {
@@ -173,6 +192,27 @@ async function readWorkflowFile(
     );
   }
   return file.content;
+}
+
+export async function getWorkflowSourceEnvironment(
+  context: WorkflowSourceContext,
+  dependencies: WorkflowSourceResolverDependencies,
+): Promise<WorkflowSourceEnvironment & { path: string }> {
+  const environmentId = "environmentId" in context
+    ? context.environmentId
+    : await dependencies.getThreadEnvironmentId(context.threadId);
+  if (environmentId === null) {
+    throw new Error("Workflow origin thread has no environment");
+  }
+  const environment = await dependencies.getEnvironment(environmentId);
+  if (environment.projectId !== context.projectId) {
+    throw new Error("Workflow origin environment belongs to another project");
+  }
+  if (!environment.path) {
+    throw new Error("Workflow origin environment has no workspace path for file resolution");
+  }
+  resolveConfinedWorkflowPath(environment.path, ".");
+  return { ...environment, path: environment.path };
 }
 
 export async function resolveWorkflowSource(
@@ -195,16 +235,11 @@ export async function resolveWorkflowSource(
       origin: { kind: "script" },
     };
   }
-  const environment = await dependencies.getEnvironment(environmentId);
-  if (environment.projectId !== context.projectId) {
-    throw new Error("Workflow origin environment belongs to another project");
-  }
-  if (environment.path === null || environment.path.length === 0) {
-    throw new Error(
-      "Workflow origin environment has no workspace path for file resolution",
-    );
-  }
-  const absolutePath =
+  const environment = await getWorkflowSourceEnvironment(
+    { projectId: context.projectId, environmentId },
+    dependencies,
+  );
+  let absolutePath =
     mode.kind === "name"
       ? workflowNamePath(environment.path, mode.name)
       : (() => {
@@ -233,17 +268,32 @@ export async function resolveWorkflowSource(
             flavor.resolve(base, mode.scriptPath),
           );
         })();
-  const source = await readWorkflowFile(
-    dependencies,
-    environment,
-    absolutePath,
-  );
+  let source: string;
+  let scope: "local" | "shared" = "local";
+  try {
+    source = await readWorkflowFile(dependencies, environment, absolutePath);
+  } catch (error) {
+    if (
+      mode.kind !== "name" || !dependencies.sharedWorkflowDirectory ||
+      !(error instanceof Error) || !isMissingWorkflowFile(error.cause)
+    ) {
+      throw error;
+    }
+    scope = "shared";
+    absolutePath = workflowNamePath(
+      dependencies.sharedWorkflowDirectory, mode.name, true,
+    );
+    source = await readWorkflowFile(
+      dependencies, environment, absolutePath,
+      dependencies.sharedWorkflowDirectory,
+    );
+  }
   return {
     source,
     environmentId,
     origin:
       mode.kind === "name"
-        ? { kind: "name", name: mode.name, path: absolutePath }
+        ? { kind: "name", name: mode.name, path: absolutePath, scope }
         : { kind: "scriptPath", path: absolutePath },
   };
 }

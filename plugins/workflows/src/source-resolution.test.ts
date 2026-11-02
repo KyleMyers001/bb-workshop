@@ -28,6 +28,83 @@ function dependencies(
 }
 
 describe("workflow source resolution", () => {
+  it("falls back only on structured absence and retains the requesting environment", async () => {
+    const readFile = vi.fn(dependencies().readFile)
+      .mockRejectedValueOnce(Object.assign(new Error("absent"), { code: "ENOENT", status: 404 }));
+    const resolved = await resolveWorkflowSource(
+      { name: "review-change" },
+      { projectId: "project-1", threadId: "thread-1" },
+      dependencies({ readFile, sharedWorkflowDirectory: "/library" }),
+    );
+    expect(resolved.environmentId).toBe("env-1");
+    expect(resolved.origin).toMatchObject({ path: "/library/review-change.js", scope: "shared" });
+    expect(readFile.mock.calls).toEqual([
+      [{ hostId: "host-1", rootPath: "/workspace/project", path: "/workspace/project/.bb/workflows/review-change.js" }],
+      [{ hostId: "host-1", rootPath: "/library", path: "/library/review-change.js" }],
+    ]);
+  });
+
+  it.each([
+    Object.assign(new Error("denied"), { code: "EACCES", status: 500 }),
+    Object.assign(new Error("offline"), { code: "host_offline", status: 503 }),
+    Object.assign(new Error("wrong host"), { code: "not_found", status: 404 }),
+    Object.assign(new Error("escape"), { code: "invalid_path", status: 400 }),
+    new Error("ENOENT: misleading message"),
+  ])("does not hide local read failure %s", async (error) => {
+    const readFile = vi.fn().mockRejectedValue(error);
+    await expect(resolveWorkflowSource(
+      { name: "review-change" }, { projectId: "project-1", environmentId: "env-1" },
+      dependencies({ readFile, sharedWorkflowDirectory: "/library" }),
+    )).rejects.toThrow(error.message);
+    expect(readFile).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { content: "AA==", contentEncoding: "base64" as const, sizeBytes: 1 },
+    { content: "x", contentEncoding: "utf8" as const, sizeBytes: MAX_WORKFLOW_SOURCE_BYTES + 1 },
+  ])("never substitutes shared for an invalid local file", async (file) => {
+    const readFile = vi.fn().mockResolvedValue(file);
+    await expect(resolveWorkflowSource(
+      { name: "review-change" }, { projectId: "project-1", environmentId: "env-1" },
+      dependencies({ readFile, sharedWorkflowDirectory: "/library" }),
+    )).rejects.toThrow();
+    expect(readFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores shared configuration for explicit paths and invalid names", async () => {
+    const readFile = vi.fn(dependencies().readFile);
+    for (const input of [{ scriptPath: "/library/review-change.js" }, { name: "../review-change" }]) {
+      await expect(resolveWorkflowSource(input, { projectId: "project-1", environmentId: "env-1" },
+        dependencies({ readFile, sharedWorkflowDirectory: "/library" }),
+      )).rejects.toThrow();
+    }
+    expect(readFile).not.toHaveBeenCalled();
+  });
+  it("keeps sharing disabled when unset and reports both missing and shared-host failures", async () => {
+    const context = { projectId: "project-1", environmentId: "env-1" };
+    const missing = Object.assign(new Error("absent"), { status: 404, code: "ENOENT" });
+    const readFile = vi.fn().mockRejectedValue(missing);
+    await expect(resolveWorkflowSource({ name: "missing" }, context, dependencies({ readFile }))).rejects.toThrow("absent");
+    expect(readFile).toHaveBeenCalledTimes(1);
+    readFile.mockClear();
+    await expect(resolveWorkflowSource({ name: "missing" }, context, dependencies({ readFile, sharedWorkflowDirectory: "/library" }))).rejects.toThrow("/library/missing.js on host host-1");
+    expect(readFile).toHaveBeenCalledTimes(2);
+    readFile.mockReset().mockRejectedValueOnce(missing).mockRejectedValueOnce(Object.assign(new Error("shared path unavailable"), { status: 503, code: "host_offline" }));
+    await expect(resolveWorkflowSource({ name: "missing" }, context, dependencies({ readFile, sharedWorkflowDirectory: "/library" }))).rejects.toThrow("shared path unavailable");
+    expect(readFile).toHaveBeenCalledTimes(2);
+  });
+
+  it("confines Windows shared names to the selected root on the requesting host", async () => {
+    const readFile = vi.fn(dependencies().readFile).mockRejectedValueOnce(Object.assign(new Error("absent"), { status: 404, code: "ENOENT" }));
+    const result = await resolveWorkflowSource({ name: "review-change" }, { projectId: "project-1", environmentId: "env-1" }, dependencies({
+      sharedWorkflowDirectory: "C:\\library",
+      getEnvironment: async () => ({ id: "env-1", projectId: "project-1", hostId: "windows-host", path: "C:\\request" }),
+      readFile,
+    }));
+    expect(result.origin).toMatchObject({ scope: "shared", path: "C:\\library\\review-change.js" });
+    expect(readFile).toHaveBeenLastCalledWith({ hostId: "windows-host", rootPath: "C:\\library", path: "C:\\library\\review-change.js" });
+  });
+
   it("maps runtime string references to trusted named resolution", () => {
     expect(workflowReferenceToSourceInput("review-change")).toEqual({
       name: "review-change",
@@ -110,6 +187,7 @@ describe("workflow source resolution", () => {
       kind: "name",
       name: "review-change",
       path: "/workspace/project/.bb/workflows/review-change.js",
+      scope: "local",
     });
   });
 

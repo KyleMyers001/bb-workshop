@@ -14,7 +14,8 @@ data. Worker threads retain normal workspace tools and permissions.
 
 This workshop fork's plugin ID is `workshop-workflows`; use that ID for
 `bb plugin config`, `enable`, `disable`, `reload`, and `logs`. The familiar
-`bb workflows` CLI and `bb_workflow_run` / `bb_workflow_result` tools are unchanged.
+`bb workflows` CLI and run/result tools remain; `bb_workflow_catalog` discovers
+saved workflows without executing them.
 Keep builtin `workflows` disabled while this fork is enabled; both register the
 same commands, tools, skill, and preview directive. Never remove either plugin
 to switch sources. Original builtin history is not migrated or resumable here.
@@ -24,12 +25,26 @@ run from a BB project thread.
 ## Start safely
 
 1. Inspect the task and repository before you choose the work list.
-2. Confirm the provider, model, and reasoning tuple from the live catalog.
-3. Write the smallest workflow that gives the requested coverage.
-4. Validate the exact source before execution.
-5. Start the background run.
+2. Discover existing workflows with `bb_workflow_catalog` or
+   `bb workflows catalog`. Inspect a match with `catalog --name <lookup-name>`:
+   read its input schema, source path, provenance, shadowing, and diagnostics.
+   Read the source on the reported origin host before choosing it.
+3. Reuse a suitable workflow by **lookup name** (filename, not `meta.name`).
+   Never copy it, change execution workspace, or invent a substitute for a
+   requested workflow that is unavailable or unsuitable; report the mismatch.
+   Author new source only when no suitable workflow exists and the task allows it.
+4. Confirm any explicit provider/model/reasoning tuple from the live provider
+   catalog; discovery itself does not consult providers.
+5. Validate with `bb workflows validate --name <lookup-name>`, then run with
+   that same selector and schema-conforming JSON args, only when authorized.
 6. Emit the returned workflow preview directive exactly once.
 7. Use compact status for progress and paged history for details.
+
+Names resolve repo-local first, then the optional `sharedWorkflowDirectory` on
+that environment's host. A broken local override blocks fallback. Catalog output
+is bounded; inspect truncation/scan diagnostics and query a known name rather
+than treating an incomplete listing as proof of absence. `list` is run history,
+not the workflow catalog. See references/runs.md for configuration and limits.
 
 Check an explicit model selection with:
 
@@ -85,8 +100,9 @@ structured worker must return its value through the workflow result tool.
 Validate and run with the same source selector:
 
 ```sh
-bb workflows validate --file .bb/workflows/review-change.js
-bb workflows run --file .bb/workflows/review-change.js --args '{"items":[]}'
+bb workflows catalog --name review-change
+bb workflows validate --name review-change
+bb workflows run --name review-change --args '{"items":[]}'
 ```
 
 The agent tool accepts script, scriptPath, or name. The CLI accepts --script,
@@ -102,6 +118,7 @@ prompts and results.
 ## Quality check
 
 - The user explicitly requested workflow orchestration.
+- Existing workflows were discovered and the selected source/arguments inspected.
 - The source passes bb workflows validate.
 - Every explicit provider tuple exists in the live catalog.
 - Each phase name matches its meta entry.

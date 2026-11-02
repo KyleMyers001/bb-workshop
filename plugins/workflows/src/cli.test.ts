@@ -63,6 +63,14 @@ describe("workflows CLI argument validation", () => {
         "invalid value '51' for --limit. Expected an integer between 1 and 50",
     },
     {
+      argv: ["catalog", "--limit", "51"],
+      error: "invalid value '51' for --limit. Expected an integer between 1 and 50",
+    },
+    {
+      argv: ["catalog", "extra"],
+      error: "unexpected argument 'extra'",
+    },
+    {
       argv: ["list", "extra"],
       error: "unexpected argument 'extra'",
     },
@@ -104,14 +112,15 @@ describe("workflows CLI argument validation", () => {
     },
   );
 
-  it("keeps one author tool and the shared Claude workflow language", async () => {
+  it("keeps discovery and run author tools and the shared Claude workflow language", async () => {
     expect(harness.registrations.agentTools.map((tool) => tool.name)).toEqual([
       "bb_workflow_run",
+      "bb_workflow_catalog",
       "bb_workflow_result",
     ]);
     expect(
       harness.registrations.cli?.commands.map((command) => command.name),
-    ).toEqual(["run", "validate", "status", "history", "list", "stop"]);
+    ).toEqual(["catalog", "run", "validate", "status", "history", "list", "stop"]);
     const run = harness.registrations.agentTools.find(
       (tool) => tool.name === "bb_workflow_run",
     );
@@ -142,7 +151,7 @@ describe("workflows CLI argument validation", () => {
     const author = await harness.resolveAgentConfiguration(
       makePluginAgentConfigurationContext(),
     );
-    expect(author.tools.map((tool) => tool.name)).toEqual(["bb_workflow_run"]);
+    expect(author.tools.map((tool) => tool.name)).toEqual(["bb_workflow_run", "bb_workflow_catalog"]);
     expect(author.skills).toEqual(["workflows"]);
   });
 });
@@ -150,6 +159,9 @@ describe("workflows CLI argument validation", () => {
 describe("workflows agent-tool boundary schemas", () => {
   it.each([
     ["bb_workflow_run", { script: "return null", extra: true }],
+    ["bb_workflow_catalog", { limit: 51 }],
+    ["bb_workflow_catalog", { name: "../escape" }],
+    ["bb_workflow_catalog", { extra: true }],
     ["bb_workflow_result", { value: null, extra: true }],
   ])("rejects extra fields for %s", async (tool, input) => {
     const { bb, harness } = createFakePluginHost({
